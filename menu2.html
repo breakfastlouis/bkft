@@ -53,7 +53,11 @@
             border-top: 2px solid #3b82f6;
         }
         /* 針對行動裝置，表格列高度增加以方便點擊 */
-        @media (max-width: 768px) {
+        .table-row {
+            padding-top: 0.75rem; /* 增加上下間距 */
+            padding-bottom: 0.75rem;
+        }
+        @media (min-width: 768px) {
             .table-row {
                 padding-top: 1rem;
                 padding-bottom: 1rem;
@@ -61,62 +65,69 @@
         }
     </style>
 </head>
-<body class="bg-gray-100 flex items-center justify-center p-4 min-h-screen">
+<body class="bg-gray-100 flex items-center justify-center p-2 sm:p-4 min-h-screen">
 
     <!-- 主容器 -->
-    <div id="main-content" class="bg-white p-6 md:p-10 rounded-3xl shadow-2xl w-full max-w-7xl overflow-hidden">
+    <div id="main-content" class="bg-white p-4 sm:p-6 md:p-10 rounded-2xl md:rounded-3xl shadow-2xl w-full max-w-7xl overflow-hidden">
         
         <!-- 頂部導航與標題 -->
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 pb-4">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-4 md:mb-0">早餐店後台管理系統</h1>
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 md:mb-6 pb-2 md:pb-4">
+            <!-- 針對手機調整標題大小 -->
+            <h1 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-800 mb-2 md:mb-0">早餐店後台管理系統</h1>
             
             <!-- 頁籤導航 -->
-            <div class="flex space-x-2 bg-gray-200 p-1 rounded-full">
-                <button id="show-menu-btn" class="py-2 px-6 rounded-full font-semibold transition-colors duration-300 bg-blue-600 text-white">菜單管理</button>
-                <button id="show-orders-btn" class="py-2 px-6 rounded-full font-semibold transition-colors duration-300 text-gray-700 hover:bg-gray-300">訂單管理</button>
+            <div class="flex space-x-1 sm:space-x-2 bg-gray-200 p-1 rounded-full text-sm sm:text-base">
+                <button id="show-menu-btn" class="py-2 px-4 sm:px-6 rounded-full font-semibold transition-colors duration-300 bg-blue-600 text-white">菜單管理</button>
+                <button id="show-orders-btn" class="py-2 px-4 sm:px-6 rounded-full font-semibold transition-colors duration-300 text-gray-700 hover:bg-gray-300">訂單管理</button>
             </div>
         </div>
 
         <!-- 菜單管理頁籤內容 -->
         <div id="menu-view" class="active-view">
             <!-- 分類導航 -->
-            <div id="category-tabs" class="flex flex-wrap gap-2 mb-6">
+            <div id="category-tabs" class="flex flex-wrap gap-2 mb-4 sm:mb-6">
                 <!-- 分類按鈕將在此處由 JavaScript 動態生成 -->
             </div>
 
-            <div class="flex justify-end mb-6 space-x-4">
-                <button id="save-order-btn" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105 shadow-md">
+            <div class="flex flex-wrap justify-end gap-2 sm:gap-4 mb-4 sm:mb-6">
+                <button id="save-order-btn" class="flex-grow sm:flex-grow-0 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 sm:px-6 rounded-xl transition duration-300 transform hover:scale-105 shadow-md text-sm sm:text-base">
                     <i class="fas fa-save mr-2"></i>儲存排序
                 </button>
-                <button id="add-item-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105 shadow-md">
+                <button id="add-item-btn" class="flex-grow sm:flex-grow-0 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 sm:px-6 rounded-xl transition duration-300 transform hover:scale-105 shadow-md text-sm sm:text-base">
                     <i class="fas fa-plus-circle mr-2"></i>新增品項
                 </button>
             </div>
-            <div id="menu-list" class="overflow-x-auto min-h-[300px] flex items-center justify-center">
-                <div id="loading-spinner-menu" class="text-center text-gray-500 hidden">
-                    <i class="fas fa-spinner fa-spin text-blue-600 text-3xl mb-2"></i>
-                    <p class="mt-2 text-lg">載入菜單中...</p>
+            <!-- 在小螢幕上啟用水平滾動 -->
+            <div class="overflow-x-auto">
+                <div id="menu-list" class="min-h-[300px] flex items-center justify-center">
+                    <div id="loading-spinner-menu" class="text-center text-gray-500 hidden">
+                        <i class="fas fa-spinner fa-spin text-blue-600 text-3xl mb-2"></i>
+                        <p class="mt-2 text-lg">載入菜單中...</p>
+                    </div>
                 </div>
             </div>
         </div>
         
         <!-- 訂單管理頁籤內容 -->
         <div id="orders-view" class="hidden">
-             <div class="flex justify-end mb-6 space-x-4">
-                <button id="add-order-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105 shadow-md">
+             <div class="flex flex-wrap justify-end gap-2 sm:gap-4 mb-4 sm:mb-6">
+                <button id="add-order-btn" class="flex-grow sm:flex-grow-0 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 sm:px-6 rounded-xl transition duration-300 transform hover:scale-105 shadow-md text-sm sm:text-base">
                     <i class="fas fa-shopping-cart mr-2"></i>新增測試訂單
                 </button>
             </div>
-            <div id="orders-list" class="overflow-x-auto min-h-[300px] flex items-center justify-center">
-                <div id="loading-spinner-orders" class="text-center text-gray-500 hidden">
-                    <i class="fas fa-spinner fa-spin text-blue-600 text-3xl mb-2"></i>
-                    <p class="mt-2 text-lg">載入訂單中...</p>
+            <!-- 在小螢幕上啟用水平滾動 -->
+            <div class="overflow-x-auto">
+                <div id="orders-list" class="min-h-[300px] flex items-center justify-center">
+                    <div id="loading-spinner-orders" class="text-center text-gray-500 hidden">
+                        <i class="fas fa-spinner fa-spin text-blue-600 text-3xl mb-2"></i>
+                        <p class="mt-2 text-lg">載入訂單中...</p>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- 狀態訊息容器 -->
-        <div id="message-container" class="mt-6"></div>
+        <div id="message-container" class="mt-4 sm:mt-6"></div>
     </div>
 
     <!-- 新增/編輯品項的彈出視窗 (Modal) -->
@@ -270,7 +281,8 @@
             const allBtn = document.createElement('button');
             allBtn.textContent = '所有品項';
             allBtn.dataset.category = 'all';
-            allBtn.className = `py-2 px-4 rounded-full font-semibold transition-colors duration-300`;
+            // 針對手機調整按鈕大小
+            allBtn.className = `py-2 px-4 rounded-full font-semibold transition-colors duration-300 text-sm sm:text-base`;
             categoryTabsEl.appendChild(allBtn);
 
             // 創建各分類按鈕
@@ -278,7 +290,8 @@
                 const btn = document.createElement('button');
                 btn.textContent = category;
                 btn.dataset.category = category;
-                btn.className = `py-2 px-4 rounded-full font-semibold transition-colors duration-300`;
+                // 針對手機調整按鈕大小
+                btn.className = `py-2 px-4 rounded-full font-semibold transition-colors duration-300 text-sm sm:text-base`;
                 categoryTabsEl.appendChild(btn);
             });
 
@@ -316,11 +329,11 @@
                 ? allMenuData
                 : allMenuData.filter(item => item['大分類'] === currentCategory);
 
-            const tableHeaders = ['排序', '圖片', '大分類', '中分類', '品項', '價格', '操作'];
+            const tableHeaders = ['排序', '圖片', '大分類', '品項', '價格', '操作'];
             let html = `<table class="min-w-full divide-y divide-gray-200 rounded-xl overflow-hidden">
                 <thead class="bg-gray-50">
                     <tr>
-                        ${tableHeaders.map(header => `<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${header}</th>`).join('')}
+                        ${tableHeaders.map(header => `<th scope="col" class="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${header}</th>`).join('')}
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200" id="menu-table-body">`;
@@ -330,15 +343,14 @@
             } else {
                 html += filteredMenu.map((item, index) => `
                     <tr class="hover:bg-gray-50 transition duration-150 cursor-move table-row" draggable="true" data-id="${item.id}" data-index="${index}">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${index + 1}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <img src="${item['圖片']}" alt="${item['品項']}" class="h-16 w-16 rounded-lg object-cover shadow-sm" onerror="this.src='https://placehold.co/64x64/E5E7EB/9CA3AF?text=No+Image'; this.alt='無圖片';">
+                        <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-900">${index + 1}</td>
+                        <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+                            <img src="${item['圖片']}" alt="${item['品項']}" class="h-12 w-12 sm:h-16 sm:w-16 rounded-lg object-cover shadow-sm" onerror="this.src='https://placehold.co/64x64/E5E7EB/9CA3AF?text=No+Image'; this.alt='無圖片';">
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${item['大分類']}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item['中分類']}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${item['品項']}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">NT$ ${item['價格']}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-900">${item['大分類']}</td>
+                        <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm font-medium text-gray-900">${item['品項']}</td>
+                        <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-900">NT$ ${item['價格']}</td>
+                        <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm font-medium">
                             <button onclick="editItem('${item.id}')" class="text-blue-600 hover:text-blue-900 transition duration-150 transform hover:scale-105 mr-2">編輯</button>
                             <button onclick="deleteItem('${item.id}')" class="text-red-600 hover:text-red-900 transition duration-150 transform hover:scale-105">刪除</button>
                         </td>
@@ -361,7 +373,7 @@
             let html = `<table class="min-w-full divide-y divide-gray-200 rounded-xl overflow-hidden">
                 <thead class="bg-gray-50">
                     <tr>
-                        ${tableHeaders.map(header => `<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${header}</th>`).join('')}
+                        ${tableHeaders.map(header => `<th scope="col" class="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${header}</th>`).join('')}
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">`;
@@ -371,21 +383,21 @@
             } else {
                 html += ordersData.map(order => `
                     <tr class="hover:bg-gray-50 transition duration-150">
-                        <td class="px-6 py-4 text-sm text-gray-900 font-mono">${order.id.slice(0, 8)}...</td>
-                        <td class="px-6 py-4 text-sm text-gray-900 font-semibold">NT$ ${order.total}</td>
-                        <td class="px-6 py-4 text-sm">
+                        <td class="px-3 py-2 sm:px-6 sm:py-4 text-sm text-gray-900 font-mono">${order.id.slice(0, 8)}...</td>
+                        <td class="px-3 py-2 sm:px-6 sm:py-4 text-sm text-gray-900 font-semibold">NT$ ${order.total}</td>
+                        <td class="px-3 py-2 sm:px-6 sm:py-4 text-sm">
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${order.status === '已完成' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
                                 ${order.status}
                             </span>
                         </td>
-                        <td class="px-6 py-4 text-sm text-gray-500">
+                        <td class="px-3 py-2 sm:px-6 sm:py-4 text-sm text-gray-500">
                             ${order.items.map(item => `${item.name} x${item.qty}`).join(', ')}
                         </td>
-                        <td class="px-6 py-4 text-sm font-medium">
-                            ${order.status !== '已完成' ? `<button onclick="completeOrder('${order.id}')" class="text-green-600 hover:text-green-900 transition duration-150 transform hover:scale-105 mr-2">
+                        <td class="px-3 py-2 sm:px-6 sm:py-4 text-sm font-medium">
+                            ${order.status !== '已完成' ? `<button onclick="completeOrder('${order.id}')" class="text-green-600 hover:text-green-900 transition duration-150 transform hover:scale-105 mr-2 text-sm sm:text-base">
                                 <i class="fas fa-check-circle"></i> 完成
                             </button>` : ''}
-                            <button onclick="deleteOrder('${order.id}')" class="text-red-600 hover:text-red-900 transition duration-150 transform hover:scale-105">
+                            <button onclick="deleteOrder('${order.id}')" class="text-red-600 hover:text-red-900 transition duration-150 transform hover:scale-105 text-sm sm:text-base">
                                 <i class="fas fa-trash"></i> 刪除
                             </button>
                         </td>
@@ -397,12 +409,13 @@
             ordersListEl.innerHTML = html;
         }
 
-        // ==== 觸控拖曳邏輯 (新增部分) ====
+        // ==== 觸控拖曳邏輯 ====
         let touchDraggedItem = null;
         let touchStartPos = { x: 0, y: 0 };
         let touchOriginalIndex = -1;
         let placeholderRow = null;
         let isTouchDragging = false;
+        let pressTimer = null;
 
         function addTouchListeners() {
             const tableBody = document.getElementById('menu-table-body');
@@ -414,7 +427,10 @@
 
                 // 檢查是否點擊在編輯/刪除按鈕上
                 const isActionButton = e.target.closest('button');
-                if(isActionButton) return;
+                if(isActionButton) {
+                    clearTimeout(pressTimer);
+                    return;
+                }
 
                 isTouchDragging = false;
                 touchStartPos = {
@@ -423,7 +439,7 @@
                 };
 
                 // 長按 500ms 後才開始拖曳
-                const pressTimer = setTimeout(() => {
+                pressTimer = setTimeout(() => {
                     isTouchDragging = true;
                     e.preventDefault(); // 阻止瀏覽器預設行為，如捲動
                     
@@ -445,16 +461,7 @@
 
                     touchDraggedItem.parentNode.insertBefore(placeholderRow, touchDraggedItem);
                     touchDraggedItem = clone;
-
                 }, 500);
-
-                // 如果手指在 500ms 內抬起，則取消拖曳
-                targetRow.addEventListener('touchend', () => {
-                    clearTimeout(pressTimer);
-                    if (!isTouchDragging) {
-                        isTouchDragging = false;
-                    }
-                }, { once: true });
             }, { passive: false });
 
             tableBody.addEventListener('touchmove', (e) => {
@@ -479,7 +486,10 @@
 
                     // 視覺回饋：移動占位符
                     const parent = placeholderRow.parentNode;
-                    parent.removeChild(placeholderRow); // 先移除再插入
+                    // 先移除再插入以更新位置
+                    if(placeholderRow.parentNode) {
+                        placeholderRow.parentNode.removeChild(placeholderRow);
+                    }
                     if (isAfter) {
                         parent.insertBefore(placeholderRow, targetRow.nextSibling);
                     } else {
@@ -489,12 +499,16 @@
             }, { passive: false });
 
             tableBody.addEventListener('touchend', (e) => {
-                if (!isTouchDragging) return;
+                clearTimeout(pressTimer);
+
+                if (!isTouchDragging) {
+                    return;
+                }
 
                 isTouchDragging = false;
 
                 // 移除假元素
-                if (touchDraggedItem) {
+                if (touchDraggedItem && document.body.contains(touchDraggedItem)) {
                     document.body.removeChild(touchDraggedItem);
                 }
 
@@ -511,7 +525,7 @@
                     const parent = placeholderRow.parentNode;
                     parent.replaceChild(originalRow, placeholderRow); // 用原始元素替換占位符
                     originalRow.style.opacity = '1'; // 恢復透明度
-                } else if (placeholderRow) {
+                } else if (placeholderRow && placeholderRow.parentNode) {
                     placeholderRow.remove();
                 }
 
