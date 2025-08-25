@@ -63,6 +63,31 @@
                 padding-bottom: 1rem;
             }
         }
+
+        /* 關鍵修復：將 input[type="file"] 偽裝成按鈕 */
+        .file-upload-button {
+            display: inline-block;
+            background-color: #f3f4f6;
+            color: #4b5563;
+            border: 1px solid #d1d5db;
+            padding: 8px 16px;
+            border-radius: 9999px; /* rounded-full */
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s, color 0.3s;
+            text-align: center;
+        }
+
+        .file-upload-button:hover {
+            background-color: #e5e7eb;
+        }
+        
+        /* 隱藏預設的檔案輸入框 */
+        input[type="file"] {
+            display: none;
+        }
+
     </style>
 </head>
 <body class="bg-gray-100 flex items-center justify-center p-2 sm:p-4 min-h-screen">
@@ -156,8 +181,12 @@
                     <input type="number" id="price" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                 </div>
                 <div>
-                    <label for="image-upload" class="block text-sm font-medium text-gray-700">圖片上傳</label>
-                    <input type="file" id="image-upload" accept="image/*" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                    <label class="block text-sm font-medium text-gray-700">圖片上傳</label>
+                    <!-- 關鍵修復：用 label 包裹 input，並將 label 樣式化為按鈕 -->
+                    <label for="image-upload" class="file-upload-button mt-1">
+                        <i class="fas fa-upload mr-2"></i> 上傳圖片
+                    </label>
+                    <input type="file" id="image-upload" accept="image/*">
                     <p class="text-xs text-gray-500 mt-1">請上傳圖片檔案 (JPG, PNG等)</p>
                     <div id="image-preview" class="mt-2 hidden">
                         <img src="" alt="Image Preview" class="h-24 w-24 rounded-lg object-cover shadow-sm">
