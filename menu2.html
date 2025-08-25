@@ -137,7 +137,7 @@
             <form id="item-form" class="space-y-4">
                 <input type="hidden" id="item-id">
                 <div>
-                    <label for="major-category" class="block text-sm font-medium text-gray-700">大分類</label>
+                    <label for="major-category-select" class="block text-sm font-medium text-gray-700">大分類</label>
                     <select id="major-category-select" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                         <!-- 選項由 JS 動態生成 -->
                     </select>
@@ -239,6 +239,7 @@
         const messageContainerEl = document.getElementById('message-container');
         const loadingSpinnerMenu = document.getElementById('loading-spinner-menu');
         const loadingSpinnerOrders = document.getElementById('loading-spinner-orders');
+        const saveBtn = document.getElementById('save-btn');
 
         // 處理刪除確認的彈出視窗
         const confirmModalEl = document.getElementById('confirm-modal');
@@ -425,7 +426,7 @@
                 const targetRow = e.target.closest('tr');
                 if (!targetRow || e.touches.length > 1) return;
 
-                // 檢查是否點擊在編輯/刪除按鈕上
+                // 檢查是否點擊在編輯/刪除按鈕上，避免衝突
                 const isActionButton = e.target.closest('button');
                 if(isActionButton) {
                     clearTimeout(pressTimer);
@@ -711,6 +712,9 @@
         formEl.addEventListener('submit', async function(event) {
             event.preventDefault();
 
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>儲存中...';
+
             const id = itemIdInput.value;
             const selectedMajorCategory = majorCategorySelect.value;
             const newMajorCategory = majorCategoryInput.value.trim();
@@ -723,6 +727,8 @@
 
             if (isNaN(price)) {
                 showMessage('價格必須是數字！', 'error');
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fas fa-save mr-2"></i>儲存';
                 return;
             }
 
@@ -730,27 +736,29 @@
             
             // 如果有上傳新圖片檔案
             if (imageFile) {
-                // 如果是編輯模式，先刪除舊圖片
-                if (id) {
-                     const oldItem = allMenuData.find(item => item.id === id);
-                     if (oldItem && oldItem['圖片']) {
-                        try {
-                           const oldImageRef = ref(storage, oldItem['圖片']);
-                           await deleteObject(oldImageRef);
-                        } catch (storageError) {
-                            console.warn("無法刪除舊圖片，可能是不存在的 URL 或權限問題:", storageError);
-                        }
-                     }
-                }
-                
-                // 上傳新圖片
-                const storageRef = ref(storage, `menu_images/${Date.now()}_${imageFile.name}`);
                 try {
+                    // 如果是編輯模式，先刪除舊圖片
+                    if (id) {
+                         const oldItem = allMenuData.find(item => item.id === id);
+                         if (oldItem && oldItem['圖片']) {
+                            try {
+                               const oldImageRef = ref(storage, oldItem['圖片']);
+                               await deleteObject(oldImageRef);
+                            } catch (storageError) {
+                                console.warn("無法刪除舊圖片，可能是不存在的 URL 或權限問題:", storageError);
+                            }
+                         }
+                    }
+                    
+                    // 上傳新圖片
+                    const storageRef = ref(storage, `menu_images/${Date.now()}_${imageFile.name}`);
                     await uploadBytes(storageRef, imageFile);
                     imageUrl = await getDownloadURL(storageRef);
                 } catch (error) {
                     console.error("圖片上傳失敗:", error);
                     showMessage('圖片上傳失敗，請稍後再試。', 'error');
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = '<i class="fas fa-save mr-2"></i>儲存';
                     return;
                 }
             }
@@ -779,6 +787,8 @@
             }
             
             closeItemModal();
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="fas fa-save mr-2"></i>儲存';
         });
 
         // 新增測試訂單
