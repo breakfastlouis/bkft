@@ -33,19 +33,14 @@
 <body class="bg-gray-100 flex items-center justify-center p-4 min-h-screen">
 
     <!-- 主容器 -->
-    <div id="main-content" class="bg-white p-6 md:p-10 rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden hidden">
+    <div id="main-content" class="bg-white p-6 md:p-10 rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden">
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b pb-4">
             <!-- 標題 -->
             <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-4 md:mb-0">早餐店菜單管理</h1>
             <div class="flex items-center space-x-4">
-                <span id="user-email" class="text-gray-600 text-sm font-medium"></span>
                 <!-- 新增品項按鈕 -->
                 <button id="add-item-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105 shadow-md">
                     + 新增品項
-                </button>
-                <!-- 登出按鈕 -->
-                <button id="logout-btn" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105 shadow-md">
-                    登出
                 </button>
             </div>
         </div>
@@ -65,40 +60,6 @@
 
         <!-- 狀態訊息容器 -->
         <div id="message-container" class="mt-6"></div>
-    </div>
-
-    <!-- 登入/註冊/重設密碼彈出視窗 (Modal) -->
-    <div id="auth-modal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-xl w-full max-w-lg transform transition-all duration-300" id="auth-modal-content">
-            <!-- 彈出視窗標題 -->
-            <h2 id="auth-modal-title" class="text-2xl font-bold text-gray-800 mb-6 text-center">後台登入</h2>
-            
-            <!-- 認證表單 -->
-            <form id="auth-form" class="space-y-4">
-                <div>
-                    <label for="auth-email" class="block text-sm font-medium text-gray-700">電子郵件</label>
-                    <input type="email" id="auth-email" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                </div>
-                <div id="password-field">
-                    <label for="auth-password" class="block text-sm font-medium text-gray-700">密碼</label>
-                    <input type="password" id="auth-password" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                </div>
-                
-                <!-- 按鈕區 -->
-                <div class="flex flex-col space-y-4 pt-4">
-                    <button type="submit" id="auth-submit-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105 shadow-md">
-                        登入
-                    </button>
-                    <button type="button" id="switch-to-register-btn" class="text-sm text-blue-600 hover:underline">
-                        沒有帳號？點此註冊
-                    </button>
-                    <button type="button" id="switch-to-reset-btn" class="text-sm text-blue-600 hover:underline">
-                        忘記密碼？
-                    </button>
-                    <div id="auth-message-container" class="mt-2 text-center text-red-500 text-sm"></div>
-                </div>
-            </form>
-        </div>
     </div>
 
     <!-- 新增/編輯品項的彈出視窗 (Modal) -->
@@ -174,14 +135,6 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { 
-            getAuth, 
-            onAuthStateChanged, 
-            signInWithEmailAndPassword, 
-            createUserWithEmailAndPassword, 
-            sendPasswordResetEmail, 
-            signOut 
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { 
             getFirestore, 
             collection, 
             doc, 
@@ -194,24 +147,8 @@
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         // 全域變數
-        let db, auth, userId, menuRef;
+        let db, menuRef;
         const mainContentEl = document.getElementById('main-content');
-        const userEmailEl = document.getElementById('user-email');
-        const logoutBtn = document.getElementById('logout-btn');
-
-        // 認證相關的 DOM 元素
-        const authModalEl = document.getElementById('auth-modal');
-        const authModalTitleEl = document.getElementById('auth-modal-title');
-        const authFormEl = document.getElementById('auth-form');
-        const authEmailInput = document.getElementById('auth-email');
-        const authPasswordInput = document.getElementById('auth-password');
-        const passwordFieldEl = document.getElementById('password-field');
-        const authSubmitBtn = document.getElementById('auth-submit-btn');
-        const switchToRegisterBtn = document.getElementById('switch-to-register-btn');
-        const switchToResetBtn = document.getElementById('switch-to-reset-btn');
-        const authMessageContainerEl = document.getElementById('auth-message-container');
-
-        // 菜單相關的 DOM 元素
         const menuListEl = document.getElementById('menu-list');
         const modalEl = document.getElementById('item-modal');
         const modalContentEl = document.getElementById('modal-content');
@@ -226,7 +163,7 @@
         const messageContainerEl = document.getElementById('message-container');
         const loadingSpinnerEl = document.getElementById('loading-spinner');
 
-        // 引入硬編碼的 CSV 數據，用於首次運行時上傳到 Firestore
+        // 硬編碼的 CSV 數據，用於首次運行時上傳到 Firestore
         const csvData = `大分類,中分類,品項,價格,圖片
 熱門,A,漢堡肉芝士蛋堡+紅茶,70,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
 熱門,B,火腿芝士蛋吐司+紅茶,60,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
@@ -374,8 +311,9 @@
             if (confirmed) {
                 try {
                     // 使用硬編碼的 'bkft' 作為 appId
-                    const appId = 'bkft'; 
-                    await deleteDoc(doc(db, `artifacts/${appId}/users/${userId}/menu_items`, id));
+                    const appId = 'bkft';
+                    // 由於不再有 userId，我們將資料儲存在公開路徑
+                    await deleteDoc(doc(db, `artifacts/${appId}/public/data/menu_items`, id));
                     showMessage('品項已成功刪除！');
                 } catch (error) {
                     console.error("Error removing document: ", error);
@@ -412,7 +350,7 @@
             try {
                 if (id) {
                     // 更新現有品項
-                    await updateDoc(doc(db, `artifacts/bkft/users/${userId}/menu_items`, id), itemData);
+                    await updateDoc(doc(db, `artifacts/bkft/public/data/menu_items`, id), itemData);
                     showMessage('品項已成功更新！');
                 } else {
                     // 新增品項
@@ -430,17 +368,6 @@
         // 按鈕事件監聽
         document.getElementById('add-item-btn').addEventListener('click', () => openItemModal());
         document.getElementById('close-modal-btn').addEventListener('click', closeItemModal);
-
-        // 登出事件監聽
-        logoutBtn.addEventListener('click', async () => {
-            try {
-                await signOut(auth);
-                showMessage('已成功登出。', 'success');
-            } catch (error) {
-                console.error('Error signing out:', error);
-                showMessage('登出時發生錯誤。', 'error');
-            }
-        });
 
         // 初始化 Firebase 和 Firestore
         window.onload = async function() {
@@ -460,55 +387,35 @@
                 const appId = 'bkft';
 
                 const app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
                 db = getFirestore(app);
 
-                // 處理使用者認證
-                onAuthStateChanged(auth, async (user) => {
-                    if (user) {
-                        // 使用者已登入，顯示菜單管理介面
-                        userId = user.uid;
-                        userEmailEl.textContent = `嗨，${user.email}`;
-                        mainContentEl.classList.remove('hidden');
-                        authModalEl.classList.add('hidden');
+                // 設定菜單資料庫參考，使用公開路徑
+                menuRef = collection(db, `artifacts/${appId}/public/data/menu_items`);
 
-                        // 設定菜單資料庫參考，使用動態的 appId
-                        menuRef = collection(db, `artifacts/${appId}/users/${userId}/menu_items`);
+                // 檢查是否已上傳初始資料
+                // 這個功能僅用於示範，正式部署時可移除
+                const snapshot = await getDocs(query(menuRef));
+                if (snapshot.empty) {
+                    console.log("沒有找到現有資料，正在從 CSV 上傳初始資料...");
+                    await uploadInitialData();
+                }
 
-                        // 檢查是否為特定帳號，如果是則上傳初始資料
-                        // 這個功能僅用於示範，正式部署時可移除
-                        if (user.email === 'breakfastlouis@gmail.com' && !localStorage.getItem('initialDataLoaded')) {
-                            const snapshot = await getDocs(query(menuRef));
-                            if (snapshot.empty) {
-                                console.log("No data found, uploading initial data from CSV...");
-                                await uploadInitialData();
-                                localStorage.setItem('initialDataLoaded', 'true');
-                            }
-                        }
-
-                        // 開始監聽 Firestore 資料
-                        onSnapshot(query(menuRef), (querySnapshot) => {
-                            const items = [];
-                            querySnapshot.forEach((doc) => {
-                                items.push({ id: doc.id, ...doc.data() });
-                            });
-                            window.menuData = items; // 將資料儲存在全域變數中
-                            renderMenu(items);
-                        }, (error) => {
-                            console.error("Error fetching data from Firestore: ", error);
-                            showMessage('無法從資料庫載入菜單。', 'error');
-                        });
-
-                    } else {
-                        // 使用者未登入，顯示認證介面
-                        mainContentEl.classList.add('hidden');
-                        authModalEl.classList.remove('hidden');
-                    }
+                // 開始監聽 Firestore 資料
+                onSnapshot(query(menuRef), (querySnapshot) => {
+                    const items = [];
+                    querySnapshot.forEach((doc) => {
+                        items.push({ id: doc.id, ...doc.data() });
+                    });
+                    window.menuData = items; // 將資料儲存在全域變數中
+                    renderMenu(items);
+                }, (error) => {
+                    console.error("無法從 Firestore 載入資料:", error);
+                    showMessage('無法從資料庫載入菜單。', 'error');
                 });
                 
             } catch (error) {
-                console.error("Error initializing Firebase:", error);
-                authMessageContainerEl.textContent = '初始化應用程式時發生錯誤。';
+                console.error("Firebase 初始化錯誤:", error);
+                // 可以選擇在這裡顯示一個錯誤訊息
             }
         };
 
@@ -527,84 +434,11 @@
                     try {
                         await addDoc(menuRef, item);
                     } catch (error) {
-                        console.error("Error uploading initial data:", error);
+                        console.error("上傳初始資料時發生錯誤:", error);
                     }
                 }
             }
         }
-
-        // 處理認證表單提交
-        authFormEl.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            const email = authEmailInput.value;
-            const password = authPasswordInput.value;
-            authMessageContainerEl.textContent = ''; // 清空錯誤訊息
-
-            if (authSubmitBtn.textContent === '登入') {
-                try {
-                    await signInWithEmailAndPassword(auth, email, password);
-                } catch (error) {
-                    console.error("登入失敗:", error);
-                    let errorMessage = '登入失敗，請檢查您的電子郵件或密碼。';
-                    if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
-                        errorMessage = '電子郵件或密碼不正確。';
-                    }
-                    authMessageContainerEl.textContent = errorMessage;
-                }
-            } else if (authSubmitBtn.textContent === '註冊') {
-                try {
-                    await createUserWithEmailAndPassword(auth, email, password);
-                    authMessageContainerEl.textContent = '註冊成功！您現在可以登入了。';
-                    // 切換回登入畫面
-                    switchToLogin();
-                } catch (error) {
-                    console.error("註冊失敗:", error);
-                    let errorMessage = '註冊失敗。';
-                    if (error.code === 'auth/email-already-in-use') {
-                        errorMessage = '此電子郵件已被使用。';
-                    } else if (error.code === 'auth/weak-password') {
-                        errorMessage = '密碼至少需為 6 個字元。';
-                    }
-                    authMessageContainerEl.textContent = errorMessage;
-                }
-            } else if (authSubmitBtn.textContent === '發送密碼重設信件') {
-                try {
-                    await sendPasswordResetEmail(auth, email);
-                    authMessageContainerEl.textContent = '密碼重設信件已發送到您的電子郵件。';
-                } catch (error) {
-                    console.error("密碼重設失敗:", error);
-                    let errorMessage = '密碼重設失敗，請檢查電子郵件地址。';
-                    authMessageContainerEl.textContent = errorMessage;
-                }
-            }
-        });
-
-        // 介面切換功能
-        function switchToLogin() {
-            authModalTitleEl.textContent = '後台登入';
-            authSubmitBtn.textContent = '登入';
-            passwordFieldEl.classList.remove('hidden');
-            switchToRegisterBtn.classList.remove('hidden');
-            switchToResetBtn.classList.remove('hidden');
-        }
-
-        switchToRegisterBtn.addEventListener('click', () => {
-            authModalTitleEl.textContent = '註冊新帳號';
-            authSubmitBtn.textContent = '註冊';
-            passwordFieldEl.classList.remove('hidden');
-            switchToRegisterBtn.classList.add('hidden');
-            switchToResetBtn.classList.remove('hidden');
-            authMessageContainerEl.textContent = '';
-        });
-
-        switchToResetBtn.addEventListener('click', () => {
-            authModalTitleEl.textContent = '重設密碼';
-            authSubmitBtn.textContent = '發送密碼重設信件';
-            passwordFieldEl.classList.add('hidden');
-            switchToRegisterBtn.classList.add('hidden');
-            switchToResetBtn.classList.add('hidden');
-            authMessageContainerEl.textContent = '';
-        });
     </script>
 </body>
 </html>
