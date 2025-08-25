@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>早餐店後台管理系統</title>
+    <!-- 使用 Inter 字體 -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <!-- 引入 Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        /* 自定義滾動條樣式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #e5e7eb;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #9ca3af;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center p-4 min-h-screen">
+
+    <!-- 主容器 -->
+    <div id="main-content" class="bg-white p-6 md:p-10 rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden hidden">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b pb-4">
+            <!-- 標題 -->
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-4 md:mb-0">早餐店菜單管理</h1>
+            <div class="flex items-center space-x-4">
+                <span id="user-email" class="text-gray-600 text-sm font-medium"></span>
+                <!-- 新增品項按鈕 -->
+                <button id="add-item-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105 shadow-md">
+                    + 新增品項
+                </button>
+                <!-- 登出按鈕 -->
+                <button id="logout-btn" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105 shadow-md">
+                    登出
+                </button>
+            </div>
+        </div>
+
+        <!-- 菜單列表容器 -->
+        <div id="menu-list" class="overflow-x-auto min-h-[300px] flex items-center justify-center">
+            <!-- 加載中的視覺回饋 -->
+            <div id="loading-spinner" class="text-center text-gray-500 hidden">
+                <svg class="animate-spin -ml-1 mr-3 h-8 w-8 text-blue-600 inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p class="mt-2 text-lg">載入菜單中...</p>
+            </div>
+            <!-- 菜單表格將在此處由 JavaScript 動態生成 -->
+        </div>
+
+        <!-- 狀態訊息容器 -->
+        <div id="message-container" class="mt-6"></div>
+    </div>
+
+    <!-- 登入/註冊/重設密碼彈出視窗 (Modal) -->
+    <div id="auth-modal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-xl w-full max-w-lg transform transition-all duration-300" id="auth-modal-content">
+            <!-- 彈出視窗標題 -->
+            <h2 id="auth-modal-title" class="text-2xl font-bold text-gray-800 mb-6 text-center">後台登入</h2>
+            
+            <!-- 認證表單 -->
+            <form id="auth-form" class="space-y-4">
+                <div>
+                    <label for="auth-email" class="block text-sm font-medium text-gray-700">電子郵件</label>
+                    <input type="email" id="auth-email" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div id="password-field">
+                    <label for="auth-password" class="block text-sm font-medium text-gray-700">密碼</label>
+                    <input type="password" id="auth-password" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                
+                <!-- 按鈕區 -->
+                <div class="flex flex-col space-y-4 pt-4">
+                    <button type="submit" id="auth-submit-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105 shadow-md">
+                        登入
+                    </button>
+                    <button type="button" id="switch-to-register-btn" class="text-sm text-blue-600 hover:underline">
+                        沒有帳號？點此註冊
+                    </button>
+                    <button type="button" id="switch-to-reset-btn" class="text-sm text-blue-600 hover:underline">
+                        忘記密碼？
+                    </button>
+                    <div id="auth-message-container" class="mt-2 text-center text-red-500 text-sm"></div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 新增/編輯品項的彈出視窗 (Modal) -->
+    <div id="item-modal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-xl w-full max-w-lg transform transition-all duration-300 scale-95 opacity-0" id="modal-content">
+            <!-- 彈出視窗標題 -->
+            <h2 id="modal-title" class="text-2xl font-bold text-gray-800 mb-6">新增菜單品項</h2>
+            
+            <!-- 表單 -->
+            <form id="item-form" class="space-y-4">
+                <!-- 品項 ID (隱藏) -->
+                <input type="hidden" id="item-id">
+                
+                <!-- 大分類 -->
+                <div>
+                    <label for="major-category" class="block text-sm font-medium text-gray-700">大分類</label>
+                    <input type="text" id="major-category" name="majorCategory" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                
+                <!-- 中分類 -->
+                <div>
+                    <label for="minor-category" class="block text-sm font-medium text-gray-700">中分類</label>
+                    <input type="text" id="minor-category" name="minorCategory" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                
+                <!-- 品項 -->
+                <div>
+                    <label for="item-name" class="block text-sm font-medium text-gray-700">品項</label>
+                    <input type="text" id="item-name" name="itemName" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                
+                <!-- 價格 -->
+                <div>
+                    <label for="price" class="block text-sm font-medium text-gray-700">價格</label>
+                    <input type="number" id="price" name="price" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                
+                <!-- 圖片網址 -->
+                <div>
+                    <label for="image-url" class="block text-sm font-medium text-gray-700">圖片網址</label>
+                    <input type="url" id="image-url" name="imageUrl" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                
+                <!-- 按鈕區 -->
+                <div class="flex justify-end space-x-4 pt-4">
+                    <button type="button" id="close-modal-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105">
+                        取消
+                    </button>
+                    <button type="submit" id="save-btn" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105">
+                        儲存
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 刪除確認的彈出視窗 -->
+    <div id="confirm-modal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-xl w-full max-w-sm" id="confirm-content">
+            <p class="text-center text-lg font-semibold text-gray-800 mb-6" id="confirm-message">您確定要刪除這個品項嗎？</p>
+            <div class="flex justify-center space-x-4">
+                <button id="confirm-cancel-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105">
+                    取消
+                </button>
+                <button id="confirm-delete-btn" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105">
+                    刪除
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 引入 Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            onAuthStateChanged, 
+            signInWithEmailAndPassword, 
+            createUserWithEmailAndPassword, 
+            sendPasswordResetEmail, 
+            signOut 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            collection, 
+            doc, 
+            onSnapshot, 
+            addDoc, 
+            updateDoc, 
+            deleteDoc, 
+            query,
+            getDocs 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // 全域變數
+        let db, auth, userId, menuRef;
+        const mainContentEl = document.getElementById('main-content');
+        const userEmailEl = document.getElementById('user-email');
+        const logoutBtn = document.getElementById('logout-btn');
+
+        // 認證相關的 DOM 元素
+        const authModalEl = document.getElementById('auth-modal');
+        const authModalTitleEl = document.getElementById('auth-modal-title');
+        const authFormEl = document.getElementById('auth-form');
+        const authEmailInput = document.getElementById('auth-email');
+        const authPasswordInput = document.getElementById('auth-password');
+        const passwordFieldEl = document.getElementById('password-field');
+        const authSubmitBtn = document.getElementById('auth-submit-btn');
+        const switchToRegisterBtn = document.getElementById('switch-to-register-btn');
+        const switchToResetBtn = document.getElementById('switch-to-reset-btn');
+        const authMessageContainerEl = document.getElementById('auth-message-container');
+
+        // 菜單相關的 DOM 元素
+        const menuListEl = document.getElementById('menu-list');
+        const modalEl = document.getElementById('item-modal');
+        const modalContentEl = document.getElementById('modal-content');
+        const modalTitleEl = document.getElementById('modal-title');
+        const formEl = document.getElementById('item-form');
+        const itemIdInput = document.getElementById('item-id');
+        const majorCategoryInput = document.getElementById('major-category');
+        const minorCategoryInput = document.getElementById('minor-category');
+        const itemNameInput = document.getElementById('item-name');
+        const priceInput = document.getElementById('price');
+        const imageUrlInput = document.getElementById('image-url');
+        const messageContainerEl = document.getElementById('message-container');
+        const loadingSpinnerEl = document.getElementById('loading-spinner');
+
+        // 引入硬編碼的 CSV 數據，用於首次運行時上傳到 Firestore
+        const csvData = `大分類,中分類,品項,價格,圖片
+熱門,A,漢堡肉芝士蛋堡+紅茶,70,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
+熱門,B,火腿芝士蛋吐司+紅茶,60,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
+熱門,C,鮪魚芝士蛋堡+紅茶,70,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
+熱門,1,檸檬雞蛋吐司+紅茶,65,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
+熱門,2,火腿蛋潛艇堡+紅茶,70,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
+熱門,3,香酥雞柳蛋堡+紅茶,80,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
+熱門,4,勁辣雞腿蛋堡+紅茶,85,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
+三明治,三明治,肉鬆三明治,40,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
+三明治,三明治,薯餅三明治,50,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
+漢堡,漢堡,總匯漢堡,70,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
+漢堡,漢堡,雞排漢堡,80,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
+蛋餅,蛋餅,九層塔蛋餅,45,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
+蛋餅,蛋餅,玉米蛋餅,40,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
+套餐,套餐,漢堡肉芝士蛋堡+紅茶,70,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
+套餐,套餐,火腿芝士蛋吐司+紅茶,60,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
+飲料,飲料,古早味紅茶,25,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
+飲料,飲料,鮮奶茶,40,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg`;
+
+        // 處理刪除確認的彈出視窗
+        const confirmModalEl = document.getElementById('confirm-modal');
+        const confirmCancelBtn = document.getElementById('confirm-cancel-btn');
+        const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+        let confirmResolver;
+
+        // 自訂 confirm 函數，以取代 window.confirm
+        function showConfirm(message) {
+            document.getElementById('confirm-message').textContent = message;
+            confirmModalEl.classList.remove('hidden');
+            return new Promise((resolve) => {
+                confirmResolver = resolve;
+            });
+        }
+
+        confirmCancelBtn.addEventListener('click', () => {
+            confirmModalEl.classList.add('hidden');
+            confirmResolver(false);
+        });
+
+        confirmDeleteBtn.addEventListener('click', () => {
+            confirmModalEl.classList.add('hidden');
+            confirmResolver(true);
+        });
+
+        // 顯示狀態訊息
+        function showMessage(message, type = 'success') {
+            const messageClasses = type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700';
+            const messageEl = document.createElement('div');
+            messageEl.className = `p-4 rounded-xl font-semibold mb-4 ${messageClasses}`;
+            messageEl.textContent = message;
+            messageContainerEl.innerHTML = '';
+            messageContainerEl.appendChild(messageEl);
+            // 訊息顯示 3 秒後自動消失
+            setTimeout(() => {
+                messageEl.remove();
+            }, 3000);
+        }
+
+        // 渲染菜單列表
+        function renderMenu(menuData) {
+            menuListEl.innerHTML = ''; // 清空內容
+            loadingSpinnerEl.classList.add('hidden'); // 隱藏載入中提示
+
+            // 創建表格標頭
+            const tableHeaders = ['圖片', '大分類', '中分類', '品項', '價格', '操作'];
+            let html = `<table class="min-w-full divide-y divide-gray-200 rounded-xl overflow-hidden">
+                <thead class="bg-gray-50">
+                    <tr>
+                        ${tableHeaders.map(header => `<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${header}</th>`).join('')}
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">`;
+
+            if (menuData.length === 0) {
+                html += `<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">目前沒有菜單品項</td></tr>`;
+            } else {
+                html += menuData.map(item => `
+                    <tr class="hover:bg-gray-50 transition duration-150">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <img src="${item['圖片']}" alt="${item['品項']}" class="h-16 w-16 rounded-lg object-cover shadow-sm" onerror="this.src='https://placehold.co/64x64/E5E7EB/9CA3AF?text=No+Image'; this.alt='無圖片';">
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${item['大分類']}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item['中分類']}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${item['品項']}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">NT$ ${item['價格']}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <button onclick="editItem('${item.id}')" class="text-blue-600 hover:text-blue-900 transition duration-150 transform hover:scale-105 mr-2">編輯</button>
+                            <button onclick="deleteItem('${item.id}')" class="text-red-600 hover:text-red-900 transition duration-150 transform hover:scale-105">刪除</button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+            
+            html += `</tbody></table>`;
+            menuListEl.innerHTML = html;
+        }
+
+        // 打開新增/編輯彈出視窗
+        function openItemModal(item = null) {
+            formEl.reset(); // 清空表單
+            itemIdInput.value = '';
+            
+            if (item) {
+                // 編輯模式
+                modalTitleEl.textContent = '編輯菜單品項';
+                itemIdInput.value = item.id;
+                majorCategoryInput.value = item['大分類'];
+                minorCategoryInput.value = item['中分類'];
+                itemNameInput.value = item['品項'];
+                priceInput.value = item['價格'];
+                imageUrlInput.value = item['圖片'];
+            } else {
+                // 新增模式
+                modalTitleEl.textContent = '新增菜單品項';
+            }
+            
+            modalEl.classList.remove('hidden');
+            // 增加動畫效果
+            setTimeout(() => {
+                modalContentEl.classList.remove('scale-95', 'opacity-0');
+                modalContentEl.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        // 關閉新增/編輯彈出視窗
+        function closeItemModal() {
+            modalContentEl.classList.remove('scale-100', 'opacity-100');
+            modalContentEl.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                modalEl.classList.add('hidden');
+            }, 300); // 動畫完成後隱藏
+        }
+
+        // 編輯品項
+        window.editItem = async function(id) {
+            const itemToEdit = window.menuData.find(item => item.id === id);
+            if (itemToEdit) {
+                openItemModal(itemToEdit);
+            }
+        };
+
+        // 刪除品項
+        window.deleteItem = async function(id) {
+            const confirmed = await showConfirm('您確定要刪除這個品項嗎？此操作無法復原。');
+            if (confirmed) {
+                try {
+                    await deleteDoc(doc(db, `artifacts/${__app_id}/users/${userId}/menu_items`, id));
+                    showMessage('品項已成功刪除！');
+                } catch (error) {
+                    console.error("Error removing document: ", error);
+                    showMessage('刪除品項時發生錯誤。', 'error');
+                }
+            }
+        };
+
+        // 表單提交事件處理
+        formEl.addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const id = itemIdInput.value;
+            const majorCategory = majorCategoryInput.value;
+            const minorCategory = minorCategoryInput.value;
+            const itemName = itemNameInput.value;
+            const price = parseFloat(priceInput.value); // 確保價格是數字
+            const imageUrl = imageUrlInput.value;
+
+            // 驗證價格是否為數字
+            if (isNaN(price)) {
+                showMessage('價格必須是數字！', 'error');
+                return;
+            }
+
+            const itemData = {
+                '大分類': majorCategory,
+                '中分類': minorCategory,
+                '品項': itemName,
+                '價格': price,
+                '圖片': imageUrl
+            };
+
+            try {
+                if (id) {
+                    // 更新現有品項
+                    await updateDoc(doc(db, `artifacts/${__app_id}/users/${userId}/menu_items`, id), itemData);
+                    showMessage('品項已成功更新！');
+                } else {
+                    // 新增品項
+                    await addDoc(menuRef, itemData);
+                    showMessage('品項已成功新增！');
+                }
+            } catch (error) {
+                console.error("Error writing document: ", error);
+                showMessage('儲存品項時發生錯誤。', 'error');
+            }
+            
+            closeItemModal();
+        });
+
+        // 按鈕事件監聽
+        document.getElementById('add-item-btn').addEventListener('click', () => openItemModal());
+        document.getElementById('close-modal-btn').addEventListener('click', closeItemModal);
+
+        // 登出事件監聽
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+                showMessage('已成功登出。', 'success');
+            } catch (error) {
+                console.error('Error signing out:', error);
+                showMessage('登出時發生錯誤。', 'error');
+            }
+        });
+
+        // 初始化 Firebase 和 Firestore
+        window.onload = async function() {
+            try {
+                // 從 Canvas 環境變數中獲取 Firebase 配置
+                const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+                    apiKey: "AIzaSyC4YeUVgqiQlZssaXnYee_mtD2MXfbcwtE",
+                    authDomain: "project-7242265943022381509.firebaseapp.com",
+                    projectId: "project-7242265943022381509",
+                    storageBucket: "project-7242265943022381509.firebasestorage.app",
+                    messagingSenderId: "95453496573",
+                    appId: "1:95453496573:web:696833aa8e3062dbcd2a94",
+                    measurementId: "G-XCTVQZ724Z"
+                };
+
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                // 處理使用者認證
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        // 使用者已登入，顯示菜單管理介面
+                        userId = user.uid;
+                        userEmailEl.textContent = `嗨，${user.email}`;
+                        mainContentEl.classList.remove('hidden');
+                        authModalEl.classList.add('hidden');
+
+                        // 設定菜單資料庫參考
+                        menuRef = collection(db, `artifacts/${__app_id}/users/${userId}/menu_items`);
+
+                        // 檢查是否為特定帳號，如果是則上傳初始資料
+                        if (user.email === 'breakfastlouis@gmail.com' && !localStorage.getItem('initialDataLoaded')) {
+                            const snapshot = await getDocs(query(menuRef));
+                            if (snapshot.empty) {
+                                console.log("No data found, uploading initial data from CSV...");
+                                await uploadInitialData();
+                                localStorage.setItem('initialDataLoaded', 'true');
+                            }
+                        }
+
+                        // 開始監聽 Firestore 資料
+                        onSnapshot(query(menuRef), (querySnapshot) => {
+                            const items = [];
+                            querySnapshot.forEach((doc) => {
+                                items.push({ id: doc.id, ...doc.data() });
+                            });
+                            window.menuData = items; // 將資料儲存在全域變數中
+                            renderMenu(items);
+                        }, (error) => {
+                            console.error("Error fetching data from Firestore: ", error);
+                            showMessage('無法從資料庫載入菜單。', 'error');
+                        });
+
+                    } else {
+                        // 使用者未登入，顯示認證介面
+                        mainContentEl.classList.add('hidden');
+                        authModalEl.classList.remove('hidden');
+                    }
+                });
+                
+            } catch (error) {
+                console.error("Error initializing Firebase:", error);
+                authMessageContainerEl.textContent = '初始化應用程式時發生錯誤。';
+            }
+        };
+
+        // 解析 CSV 數據並上傳到 Firestore
+        async function uploadInitialData() {
+            const lines = csvData.split('\n');
+            const headers = lines[0].split(',').map(h => h.trim());
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',').map(v => v.trim());
+                if (values.length === headers.length) {
+                    const item = {};
+                    headers.forEach((header, index) => {
+                        // 處理價格轉換為數字
+                        item[header] = (header === '價格') ? parseFloat(values[index]) : values[index];
+                    });
+                    try {
+                        await addDoc(menuRef, item);
+                    } catch (error) {
+                        console.error("Error uploading initial data:", error);
+                    }
+                }
+            }
+        }
+
+        // 處理認證表單提交
+        authFormEl.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const email = authEmailInput.value;
+            const password = authPasswordInput.value;
+            authMessageContainerEl.textContent = ''; // 清空錯誤訊息
+
+            if (authSubmitBtn.textContent === '登入') {
+                try {
+                    await signInWithEmailAndPassword(auth, email, password);
+                } catch (error) {
+                    console.error("登入失敗:", error);
+                    let errorMessage = '登入失敗，請檢查您的電子郵件或密碼。';
+                    if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+                        errorMessage = '電子郵件或密碼不正確。';
+                    }
+                    authMessageContainerEl.textContent = errorMessage;
+                }
+            } else if (authSubmitBtn.textContent === '註冊') {
+                try {
+                    await createUserWithEmailAndPassword(auth, email, password);
+                    authMessageContainerEl.textContent = '註冊成功！您現在可以登入了。';
+                    // 切換回登入畫面
+                    switchToLogin();
+                } catch (error) {
+                    console.error("註冊失敗:", error);
+                    let errorMessage = '註冊失敗。';
+                    if (error.code === 'auth/email-already-in-use') {
+                        errorMessage = '此電子郵件已被使用。';
+                    } else if (error.code === 'auth/weak-password') {
+                        errorMessage = '密碼至少需為 6 個字元。';
+                    }
+                    authMessageContainerEl.textContent = errorMessage;
+                }
+            } else if (authSubmitBtn.textContent === '發送密碼重設信件') {
+                try {
+                    await sendPasswordResetEmail(auth, email);
+                    authMessageContainerEl.textContent = '密碼重設信件已發送到您的電子郵件。';
+                } catch (error) {
+                    console.error("密碼重設失敗:", error);
+                    let errorMessage = '密碼重設失敗，請檢查電子郵件地址。';
+                    authMessageContainerEl.textContent = errorMessage;
+                }
+            }
+        });
+
+        // 介面切換功能
+        function switchToLogin() {
+            authModalTitleEl.textContent = '後台登入';
+            authSubmitBtn.textContent = '登入';
+            passwordFieldEl.classList.remove('hidden');
+            switchToRegisterBtn.classList.remove('hidden');
+            switchToResetBtn.classList.remove('hidden');
+        }
+
+        switchToRegisterBtn.addEventListener('click', () => {
+            authModalTitleEl.textContent = '註冊新帳號';
+            authSubmitBtn.textContent = '註冊';
+            passwordFieldEl.classList.remove('hidden');
+            switchToRegisterBtn.classList.add('hidden');
+            switchToResetBtn.classList.remove('hidden');
+            authMessageContainerEl.textContent = '';
+        });
+
+        switchToResetBtn.addEventListener('click', () => {
+            authModalTitleEl.textContent = '重設密碼';
+            authSubmitBtn.textContent = '發送密碼重設信件';
+            passwordFieldEl.classList.add('hidden');
+            switchToRegisterBtn.classList.add('hidden');
+            switchToResetBtn.classList.add('hidden');
+            authMessageContainerEl.textContent = '';
+        });
+    </script>
+</body>
+</html>
