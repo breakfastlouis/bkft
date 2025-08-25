@@ -30,14 +30,34 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #6b7280;
         }
-        /* 拖曳中物件的樣式 */
+        /* 拖曳中物件的樣式 (適用於滑鼠) */
         .dragging {
             opacity: 0.5;
             background-color: #e2e8f0;
         }
+        /* 觸控拖曳中物件的樣式 */
+        .touch-dragging {
+            position: fixed; /* 固定在視口中 */
+            pointer-events: none; /* 避免觸發額外事件 */
+            z-index: 1000;
+            opacity: 0.8;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            transform: rotate(2deg); /* 視覺效果 */
+            border-radius: 12px;
+            width: auto;
+            max-width: 80%;
+            transition: none; /* 避免拖曳時有奇怪的動畫 */
+        }
         /* 拖曳放置目標的樣式 */
         .drag-over {
             border-top: 2px solid #3b82f6;
+        }
+        /* 針對行動裝置，表格列高度增加以方便點擊 */
+        @media (max-width: 768px) {
+            .table-row {
+                padding-top: 1rem;
+                padding-bottom: 1rem;
+            }
         }
     </style>
 </head>
@@ -175,7 +195,7 @@
             getDocs,
             writeBatch
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
         
         // 全域變數
         let db, storage, menuRef, ordersRef;
@@ -287,7 +307,6 @@
             });
         }
 
-
         // 渲染菜單列表
         function renderMenu() {
             menuListEl.innerHTML = '';
@@ -297,7 +316,7 @@
                 ? allMenuData
                 : allMenuData.filter(item => item['大分類'] === currentCategory);
 
-            const tableHeaders = ['圖片', '大分類', '中分類', '品項', '價格', '操作'];
+            const tableHeaders = ['排序', '圖片', '大分類', '中分類', '品項', '價格', '操作'];
             let html = `<table class="min-w-full divide-y divide-gray-200 rounded-xl overflow-hidden">
                 <thead class="bg-gray-50">
                     <tr>
@@ -307,10 +326,11 @@
                 <tbody class="bg-white divide-y divide-gray-200" id="menu-table-body">`;
 
             if (filteredMenu.length === 0) {
-                html += `<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">此分類目前沒有菜單品項</td></tr>`;
+                html += `<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">此分類目前沒有菜單品項</td></tr>`;
             } else {
-                html += filteredMenu.map(item => `
-                    <tr class="hover:bg-gray-50 transition duration-150 cursor-move" draggable="true" data-id="${item.id}">
+                html += filteredMenu.map((item, index) => `
+                    <tr class="hover:bg-gray-50 transition duration-150 cursor-move table-row" draggable="true" data-id="${item.id}" data-index="${index}">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${index + 1}</td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <img src="${item['圖片']}" alt="${item['品項']}" class="h-16 w-16 rounded-lg object-cover shadow-sm" onerror="this.src='https://placehold.co/64x64/E5E7EB/9CA3AF?text=No+Image'; this.alt='無圖片';">
                         </td>
@@ -329,6 +349,7 @@
             html += `</tbody></table>`;
             menuListEl.innerHTML = html;
             addDragAndDropListeners();
+            addTouchListeners();
         }
 
         // 渲染訂單列表
@@ -375,8 +396,160 @@
             html += `</tbody></table>`;
             ordersListEl.innerHTML = html;
         }
+
+        // ==== 觸控拖曳邏輯 (新增部分) ====
+        let touchDraggedItem = null;
+        let touchStartPos = { x: 0, y: 0 };
+        let touchOriginalIndex = -1;
+        let placeholderRow = null;
+        let isTouchDragging = false;
+
+        function addTouchListeners() {
+            const tableBody = document.getElementById('menu-table-body');
+            if (!tableBody) return;
+
+            tableBody.addEventListener('touchstart', (e) => {
+                const targetRow = e.target.closest('tr');
+                if (!targetRow || e.touches.length > 1) return;
+
+                // 檢查是否點擊在編輯/刪除按鈕上
+                const isActionButton = e.target.closest('button');
+                if(isActionButton) return;
+
+                isTouchDragging = false;
+                touchStartPos = {
+                    x: e.touches[0].clientX,
+                    y: e.touches[0].clientY
+                };
+
+                // 長按 500ms 後才開始拖曳
+                const pressTimer = setTimeout(() => {
+                    isTouchDragging = true;
+                    e.preventDefault(); // 阻止瀏覽器預設行為，如捲動
+                    
+                    touchDraggedItem = targetRow;
+                    touchOriginalIndex = parseInt(targetRow.dataset.index);
+
+                    // 創建一個假的拖曳元素，這樣可以避免直接操作原來的元素導致頁面跳動
+                    const clone = touchDraggedItem.cloneNode(true);
+                    clone.classList.add('touch-dragging');
+                    clone.style.left = `${touchStartPos.x}px`;
+                    clone.style.top = `${touchStartPos.y}px`;
+                    document.body.appendChild(clone);
+
+                    // 創建一個占位符來保持列表空間
+                    placeholderRow = document.createElement('tr');
+                    placeholderRow.classList.add('drag-over');
+                    placeholderRow.style.height = `${touchDraggedItem.offsetHeight}px`;
+                    touchDraggedItem.style.opacity = '0'; // 隱藏原始元素
+
+                    touchDraggedItem.parentNode.insertBefore(placeholderRow, touchDraggedItem);
+                    touchDraggedItem = clone;
+
+                }, 500);
+
+                // 如果手指在 500ms 內抬起，則取消拖曳
+                targetRow.addEventListener('touchend', () => {
+                    clearTimeout(pressTimer);
+                    if (!isTouchDragging) {
+                        isTouchDragging = false;
+                    }
+                }, { once: true });
+            }, { passive: false });
+
+            tableBody.addEventListener('touchmove', (e) => {
+                if (!isTouchDragging || !touchDraggedItem) return;
+                e.preventDefault();
+
+                const touch = e.touches[0];
+                const newX = touch.clientX;
+                const newY = touch.clientY;
+
+                // 更新假元素的顯示位置
+                touchDraggedItem.style.left = `${newX}px`;
+                touchDraggedItem.style.top = `${newY}px`;
+
+                // 尋找新的放置目標
+                const targetElement = document.elementFromPoint(newX, newY);
+                const targetRow = targetElement ? targetElement.closest('tr') : null;
+                
+                if (targetRow && targetRow !== placeholderRow) {
+                    const rect = targetRow.getBoundingClientRect();
+                    const isAfter = newY > rect.top + rect.height / 2;
+
+                    // 視覺回饋：移動占位符
+                    const parent = placeholderRow.parentNode;
+                    parent.removeChild(placeholderRow); // 先移除再插入
+                    if (isAfter) {
+                        parent.insertBefore(placeholderRow, targetRow.nextSibling);
+                    } else {
+                        parent.insertBefore(placeholderRow, targetRow);
+                    }
+                }
+            }, { passive: false });
+
+            tableBody.addEventListener('touchend', (e) => {
+                if (!isTouchDragging) return;
+
+                isTouchDragging = false;
+
+                // 移除假元素
+                if (touchDraggedItem) {
+                    document.body.removeChild(touchDraggedItem);
+                }
+
+                // 更新本地數據順序
+                const tableRows = tableBody.querySelectorAll('tr[data-id]');
+                const newOrder = Array.from(tableRows).map(row => row.dataset.id);
+                
+                const oldId = allMenuData[touchOriginalIndex].id;
+                const newIndex = newOrder.findIndex(id => id === oldId);
+
+                // 移除原始行並將其插入新位置
+                const originalRow = document.querySelector(`tr[data-id="${oldId}"]`);
+                if (placeholderRow && originalRow) {
+                    const parent = placeholderRow.parentNode;
+                    parent.replaceChild(originalRow, placeholderRow); // 用原始元素替換占位符
+                    originalRow.style.opacity = '1'; // 恢復透明度
+                } else if (placeholderRow) {
+                    placeholderRow.remove();
+                }
+
+                // 同步 local allMenuData
+                const draggedItemData = allMenuData.splice(touchOriginalIndex, 1)[0];
+                allMenuData.splice(newIndex, 0, draggedItemData);
+
+                // 重新渲染表格以更新排序編號
+                renderMenu(); 
+
+                touchDraggedItem = null;
+                placeholderRow = null;
+            });
+        }
         
-        // 處理拖曳排序的邏輯
+        // 將新的排序儲存到 Firestore
+        async function saveOrderToFirestore() {
+            if (allMenuData.length === 0) {
+                showMessage('沒有可以儲存的資料。', 'error');
+                return;
+            }
+
+            const batch = writeBatch(db);
+            allMenuData.forEach((item, index) => {
+                const itemRef = doc(db, `artifacts/${appId}/public/data/menu_items`, item.id);
+                batch.update(itemRef, { sortOrder: index });
+            });
+
+            try {
+                await batch.commit();
+                showMessage('菜單順序已成功儲存！', 'success');
+            } catch (error) {
+                console.error('儲存排序時發生錯誤:', error);
+                showMessage('儲存排序時發生錯誤，請稍後再試。', 'error');
+            }
+        }
+        
+        // 處理滑鼠拖曳邏輯
         function addDragAndDropListeners() {
             const tableBody = document.getElementById('menu-table-body');
             if (!tableBody) return;
@@ -404,8 +577,6 @@
                 e.preventDefault();
                 const target = e.target.closest('tr');
                 if (target && target !== draggedItem) {
-                    const rect = target.getBoundingClientRect();
-                    const isAfter = e.clientY > rect.top + rect.height / 2;
                     const rows = tableBody.querySelectorAll('tr');
                     rows.forEach(row => row.classList.remove('drag-over'));
                     target.classList.add('drag-over');
@@ -442,28 +613,6 @@
             });
         }
         
-        // 將新的排序儲存到 Firestore
-        async function saveOrderToFirestore() {
-            if (allMenuData.length === 0) {
-                showMessage('沒有可以儲存的資料。', 'error');
-                return;
-            }
-
-            const batch = writeBatch(db);
-            allMenuData.forEach((item, index) => {
-                const itemRef = doc(db, `artifacts/${appId}/public/data/menu_items`, item.id);
-                batch.update(itemRef, { sortOrder: index });
-            });
-
-            try {
-                await batch.commit();
-                showMessage('菜單順序已成功儲存！', 'success');
-            } catch (error) {
-                console.error('儲存排序時發生錯誤:', error);
-                showMessage('儲存排序時發生錯誤，請稍後再試。', 'error');
-            }
-        }
-
         // 打開新增/編輯彈出視窗
         function openItemModal(item = null) {
             formEl.reset();
@@ -523,6 +672,18 @@
             const confirmed = await showConfirm('您確定要刪除這個品項嗎？此操作無法復原。');
             if (confirmed) {
                 try {
+                    // 取得要刪除的品項資料，以獲得圖片 URL
+                    const itemToDelete = allMenuData.find(item => item.id === id);
+                    if (itemToDelete && itemToDelete['圖片']) {
+                        try {
+                            // 刪除 Firebase Storage 上的圖片
+                            const oldImageRef = ref(storage, itemToDelete['圖片']);
+                            await deleteObject(oldImageRef);
+                        } catch (storageError) {
+                            console.warn("無法刪除儲存空間中的圖片，可能是不存在的 URL 或權限問題:", storageError);
+                        }
+                    }
+                    // 刪除 Firestore 中的文件
                     await deleteDoc(doc(db, `artifacts/${appId}/public/data/menu_items`, id));
                     showMessage('品項已成功刪除！');
                 } catch (error) {
@@ -552,7 +713,23 @@
             }
 
             let imageUrl = imagePreviewImg.src.startsWith('https://') ? imagePreviewImg.src : '';
+            
+            // 如果有上傳新圖片檔案
             if (imageFile) {
+                // 如果是編輯模式，先刪除舊圖片
+                if (id) {
+                     const oldItem = allMenuData.find(item => item.id === id);
+                     if (oldItem && oldItem['圖片']) {
+                        try {
+                           const oldImageRef = ref(storage, oldItem['圖片']);
+                           await deleteObject(oldImageRef);
+                        } catch (storageError) {
+                            console.warn("無法刪除舊圖片，可能是不存在的 URL 或權限問題:", storageError);
+                        }
+                     }
+                }
+                
+                // 上傳新圖片
                 const storageRef = ref(storage, `menu_images/${Date.now()}_${imageFile.name}`);
                 try {
                     await uploadBytes(storageRef, imageFile);
