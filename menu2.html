@@ -63,28 +63,9 @@
                 padding-bottom: 1rem;
             }
         }
-
-        /* 關鍵修復：將 input[type="file"] 偽裝成按鈕 */
-        .file-upload-button {
-            display: inline-block;
-            background-color: #f3f4f6;
-            color: #4b5563;
-            border: 1px solid #d1d5db;
-            padding: 8px 16px;
-            border-radius: 9999px; /* rounded-full */
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color 0.3s, color 0.3s;
-            text-align: center;
-        }
-
-        .file-upload-button:hover {
-            background-color: #e5e7eb;
-        }
         
         /* 隱藏預設的檔案輸入框 */
-        input[type="file"] {
+        #image-upload {
             display: none;
         }
 
@@ -169,8 +150,8 @@
                     <input type="text" id="major-category-input" placeholder="或輸入新分類" class="mt-2 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                 </div>
                 <div>
-                    <label for="minor-category" class="block text-sm font-medium text-gray-700">中分類</label>
-                    <input type="text" id="minor-category" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    <label for="item-code" class="block text-sm font-medium text-gray-700">餐點編號</label>
+                    <input type="text" id="item-code" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                 </div>
                 <div>
                     <label for="item-name" class="block text-sm font-medium text-gray-700">品項</label>
@@ -182,10 +163,11 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">圖片上傳</label>
-                    <!-- 關鍵修復：用 label 包裹 input，並將 label 樣式化為按鈕 -->
-                    <label for="image-upload" class="file-upload-button mt-1">
-                        <i class="fas fa-upload mr-2"></i> 上傳圖片
-                    </label>
+                    <!-- 新的按鈕觸發方式 -->
+                    <button type="button" id="image-upload-btn" class="mt-1 inline-block bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-xl transition duration-300 transform hover:scale-105">
+                        <i class="fas fa-upload mr-2"></i>上傳圖片
+                    </button>
+                    <!-- 檔案輸入框保持隱藏 -->
                     <input type="file" id="image-upload" accept="image/*">
                     <p class="text-xs text-gray-500 mt-1">請上傳圖片檔案 (JPG, PNG等)</p>
                     <div id="image-preview" class="mt-2 hidden">
@@ -259,10 +241,11 @@
         const itemIdInput = document.getElementById('item-id');
         const majorCategorySelect = document.getElementById('major-category-select');
         const majorCategoryInput = document.getElementById('major-category-input');
-        const minorCategoryInput = document.getElementById('minor-category');
+        const itemCodeInput = document.getElementById('item-code');
         const itemNameInput = document.getElementById('item-name');
         const priceInput = document.getElementById('price');
         const imageUploadInput = document.getElementById('image-upload');
+        const imageUploadBtn = document.getElementById('image-upload-btn');
         const imagePreviewEl = document.getElementById('image-preview');
         const imagePreviewImg = imagePreviewEl.querySelector('img');
         const messageContainerEl = document.getElementById('message-container');
@@ -359,7 +342,8 @@
                 ? allMenuData
                 : allMenuData.filter(item => item['大分類'] === currentCategory);
 
-            const tableHeaders = ['排序', '圖片', '大分類', '品項', '價格', '操作'];
+            // 更新表格標頭
+            const tableHeaders = ['排序', '圖片', '大分類', '餐點編號', '品項', '價格', '操作'];
             let html = `<table class="min-w-full divide-y divide-gray-200 rounded-xl overflow-hidden">
                 <thead class="bg-gray-50">
                     <tr>
@@ -378,6 +362,7 @@
                             <img src="${item['圖片']}" alt="${item['品項']}" class="h-12 w-12 sm:h-16 sm:w-16 rounded-lg object-cover shadow-sm" onerror="this.src='https://placehold.co/64x64/E5E7EB/9CA3AF?text=No+Image'; this.alt='無圖片';">
                         </td>
                         <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-900">${item['大分類']}</td>
+                        <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-900">${item['餐點編號'] || '-'}</td>
                         <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm font-medium text-gray-900">${item['品項']}</td>
                         <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-900">NT$ ${item['價格']}</td>
                         <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm font-medium">
@@ -424,9 +409,9 @@
                             ${order.items.map(item => `${item.name} x${item.qty}`).join(', ')}
                         </td>
                         <td class="px-3 py-2 sm:px-6 sm:py-4 text-sm font-medium">
-                            ${order.status !== '已完成' ? `<button onclick="completeOrder('${order.id}')" class="text-green-600 hover:text-green-900 transition duration-150 transform hover:scale-105 mr-2 text-sm sm:text-base">
+                            <button onclick="completeOrder('${order.id}')" class="text-green-600 hover:text-green-900 transition duration-150 transform hover:scale-105 mr-2 text-sm sm:text-base">
                                 <i class="fas fa-check-circle"></i> 完成
-                            </button>` : ''}
+                            </button>
                             <button onclick="deleteOrder('${order.id}')" class="text-red-600 hover:text-red-900 transition duration-150 transform hover:scale-105 text-sm sm:text-base">
                                 <i class="fas fa-trash"></i> 刪除
                             </button>
@@ -679,7 +664,7 @@
                 modalTitleEl.textContent = '編輯菜單品項';
                 itemIdInput.value = item.id;
                 majorCategorySelect.value = item['大分類'];
-                minorCategoryInput.value = item['中分類'];
+                itemCodeInput.value = item['餐點編號'] || '';
                 itemNameInput.value = item['品項'];
                 priceInput.value = item['價格'];
                 if (item['圖片']) {
@@ -749,7 +734,7 @@
             const newMajorCategory = majorCategoryInput.value.trim();
             const finalMajorCategory = newMajorCategory || selectedMajorCategory;
             
-            const minorCategory = minorCategoryInput.value;
+            const itemCode = itemCodeInput.value;
             const itemName = itemNameInput.value;
             const price = parseFloat(priceInput.value);
             const imageFile = imageUploadInput.files[0];
@@ -792,9 +777,10 @@
                 }
             }
 
+            // 更新物件屬性名稱
             const itemData = {
                 '大分類': finalMajorCategory,
-                '中分類': minorCategory,
+                '餐點編號': itemCode,
                 '品項': itemName,
                 '價格': price,
                 '圖片': imageUrl
@@ -911,6 +897,10 @@
         document.getElementById('add-item-btn').addEventListener('click', () => openItemModal());
         document.getElementById('save-order-btn').addEventListener('click', saveOrderToFirestore);
         document.getElementById('close-modal-btn').addEventListener('click', closeItemModal);
+        // 新增的事件監聽器：點擊按鈕來觸發隱藏的檔案輸入框
+        imageUploadBtn.addEventListener('click', () => {
+            imageUploadInput.click();
+        });
 
         // 初始化 Firebase 和 Firestore
         window.onload = async function() {
@@ -981,24 +971,25 @@
 
         // 解析 CSV 數據並上傳到 Firestore
         async function uploadInitialData() {
-            const csvData = `大分類,中分類,品項,價格,圖片
-熱門,A,漢堡肉芝士蛋堡+紅茶,70,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-熱門,B,火腿芝士蛋吐司+紅茶,60,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-熱門,C,鮪魚芝士蛋堡+紅茶,70,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-熱門,1,檸檬雞蛋吐司+紅茶,65,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-熱門,2,火腿蛋潛艇堡+紅茶,70,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-熱門,3,香酥雞柳蛋堡+紅茶,80,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-熱門,4,勁辣雞腿蛋堡+紅茶,85,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-三明治,三明治,肉鬆三明治,40,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-三明治,三明治,薯餅三明治,50,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-漢堡,漢堡,總匯漢堡,70,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-漢堡,漢堡,雞排漢堡,80,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-蛋餅,蛋餅,九層塔蛋餅,45,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-蛋餅,蛋餅,玉米蛋餅,40,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-套餐,套餐,漢堡肉芝士蛋堡+紅茶,70,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-套餐,套餐,火腿芝士蛋吐司+紅茶,60,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-飲料,飲料,古早味紅茶,25,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-飲料,飲料,鮮奶茶,40,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg`;
+            // 更新 CSV 標頭
+            const csvData = `大分類,品項,價格,圖片,餐點編號
+熱門,漢堡肉芝士蛋堡+紅茶,70,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,A
+熱門,火腿芝士蛋吐司+紅茶,60,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,B
+熱門,鮪魚芝士蛋堡+紅茶,70,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,C
+熱門,檸檬雞蛋吐司+紅茶,65,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,1
+熱門,火腿蛋潛艇堡+紅茶,70,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,2
+熱門,香酥雞柳蛋堡+紅茶,80,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,3
+熱門,勁辣雞腿蛋堡+紅茶,85,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,4
+三明治,肉鬆三明治,40,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,1
+三明治,薯餅三明治,50,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,2
+漢堡,總匯漢堡,70,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,1
+漢堡,雞排漢堡,80,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,2
+蛋餅,九層塔蛋餅,45,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,1
+蛋餅,玉米蛋餅,40,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,2
+套餐,漢堡肉芝士蛋堡+紅茶,70,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,1
+套餐,火腿芝士蛋吐司+紅茶,60,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,2
+飲料,古早味紅茶,25,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,1
+飲料,鮮奶茶,40,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,2`;
             
             const lines = csvData.split('\n');
             const headers = lines[0].split(',').map(h => h.trim());
