@@ -373,7 +373,9 @@
             const confirmed = await showConfirm('您確定要刪除這個品項嗎？此操作無法復原。');
             if (confirmed) {
                 try {
-                    await deleteDoc(doc(db, `artifacts/${__app_id}/users/${userId}/menu_items`, id));
+                    // 使用硬編碼的 'bkft' 作為 appId
+                    const appId = 'bkft'; 
+                    await deleteDoc(doc(db, `artifacts/${appId}/users/${userId}/menu_items`, id));
                     showMessage('品項已成功刪除！');
                 } catch (error) {
                     console.error("Error removing document: ", error);
@@ -410,7 +412,7 @@
             try {
                 if (id) {
                     // 更新現有品項
-                    await updateDoc(doc(db, `artifacts/${__app_id}/users/${userId}/menu_items`, id), itemData);
+                    await updateDoc(doc(db, `artifacts/bkft/users/${userId}/menu_items`, id), itemData);
                     showMessage('品項已成功更新！');
                 } else {
                     // 新增品項
@@ -443,8 +445,8 @@
         // 初始化 Firebase 和 Firestore
         window.onload = async function() {
             try {
-                // 從 Canvas 環境變數中獲取 Firebase 配置
-                const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+                // 從 Canvas 環境變數中獲取 Firebase 配置，如果不存在則使用預設值
+                const firebaseConfig = {
                     apiKey: "AIzaSyC4YeUVgqiQlZssaXnYee_mtD2MXfbcwtE",
                     authDomain: "project-7242265943022381509.firebaseapp.com",
                     projectId: "project-7242265943022381509",
@@ -453,6 +455,9 @@
                     appId: "1:95453496573:web:696833aa8e3062dbcd2a94",
                     measurementId: "G-XCTVQZ724Z"
                 };
+
+                // 設定 App ID，使用硬編碼的值
+                const appId = 'bkft';
 
                 const app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
@@ -467,10 +472,11 @@
                         mainContentEl.classList.remove('hidden');
                         authModalEl.classList.add('hidden');
 
-                        // 設定菜單資料庫參考
-                        menuRef = collection(db, `artifacts/${__app_id}/users/${userId}/menu_items`);
+                        // 設定菜單資料庫參考，使用動態的 appId
+                        menuRef = collection(db, `artifacts/${appId}/users/${userId}/menu_items`);
 
                         // 檢查是否為特定帳號，如果是則上傳初始資料
+                        // 這個功能僅用於示範，正式部署時可移除
                         if (user.email === 'breakfastlouis@gmail.com' && !localStorage.getItem('initialDataLoaded')) {
                             const snapshot = await getDocs(query(menuRef));
                             if (snapshot.empty) {
