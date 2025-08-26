@@ -1,55 +1,73 @@
 import React, { useState, useEffect } from 'react';
 
-// Firebase import
+// Firebase imports for Firestore and Auth
 import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
 import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc, query, getDocs, writeBatch } from 'firebase/firestore';
-import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
-// 定義 Firebase 設定和 App ID
-const firebaseConfig = {
-  apiKey: "AIzaSyC4YeUVgqiQlZssaXnYee_mtD2MXfbcwtE",
-  authDomain: "project-7242265943022381509.firebaseapp.com",
-  projectId: "project-7242265943022381509",
-  storageBucket: "project-7242265943022381509.appspot.com",
-  messagingSenderId: "95453496573",
-  appId: "1:95453496573:web:696833aa8e3062dbcd2a94",
-  measurementId: "G-XCTVQZ724Z"
-};
-const appId = 'bkft';
+// Define Firebase configuration and App ID from environment variables
+const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+// Cloudinary configuration (replace with your values)
+const CLOUDINARY_CLOUD_NAME = 'dfkanhnem';
+const CLOUDINARY_UPLOAD_PRESET = 'menu-images-preset'; // 請務必在 Cloudinary 後台創建此預設！
+const CLOUDINARY_API_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
 
 const App = () => {
-  // 全域狀態管理
+  // Global state management
   const [db, setDb] = useState(null);
-  const [storage, setStorage] = useState(null);
+  const [auth, setAuth] = useState(null);
+  const [userId, setUserId] = useState(null);
   const [menuItems, setMenuItems] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [activeTab, setActiveTab] = useState('menu');
+  const [activeTab, setActiveTab] = useState('orders');
   const [activeCategory, setActiveCategory] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [isConfirmModalOpen, setIsConfirmModal] = useState(false);
   const [currentConfirmAction, setCurrentConfirmAction] = useState(null);
   const [message, setMessage] = useState({ text: '', type: '' });
-  const [loading, setLoading] = useState({ menu: true, orders: true });
+  const [loading, setLoading] = useState({ menu: true, orders: true, auth: true });
   const [currentMenuItem, setCurrentMenuItem] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  // 初始化 Firebase
+  // Initialize Firebase and authenticate
   useEffect(() => {
-    try {
-      const app = initializeApp(firebaseConfig);
-      const firestore = getFirestore(app);
-      const storageInstance = getStorage(app);
-      setDb(firestore);
-      setStorage(storageInstance);
-    } catch (error) {
-      console.error("Firebase 初始化失敗:", error);
-      showMessage('Firebase 初始化失敗，請檢查設定。', 'error');
-    }
+    const initFirebase = async () => {
+      try {
+        const app = initializeApp(firebaseConfig);
+        const firestore = getFirestore(app);
+        const authService = getAuth(app);
+        setDb(firestore);
+        setAuth(authService);
+        
+        if (initialAuthToken) {
+          await signInWithCustomToken(authService, initialAuthToken);
+        } else {
+          await signInAnonymously(authService);
+        }
+        
+        authService.onAuthStateChanged(user => {
+          if (user) {
+            setUserId(user.uid);
+          } else {
+            setUserId(null);
+          }
+          setLoading(prev => ({ ...prev, auth: false }));
+        });
+      } catch (error) {
+        console.error("Firebase initialization or authentication failed:", error);
+        showMessage('Firebase 初始化或認證失敗。', 'error');
+        setLoading(prev => ({ ...prev, auth: false }));
+      }
+    };
+    initFirebase();
   }, []);
 
-  // 監聽 Firebase 菜單資料
+  // Listen to menu data from Firebase
   useEffect(() => {
-    if (!db) return;
+    if (!db || !userId) return;
     const menuRef = collection(db, `artifacts/${appId}/public/data/menu_items`);
     const q = query(menuRef);
 
@@ -67,22 +85,22 @@ const App = () => {
       setMenuItems(items);
       setLoading(prev => ({ ...prev, menu: false }));
 
-      // 如果是第一次載入，檢查並上傳初始資料
+      // If it's the first load and menu is empty, upload initial data
       if (items.length === 0) {
-        await uploadInitialData();
+        await uploadInitialData(db);
       }
     }, (error) => {
-      console.error("無法從 Firestore 載入菜單資料:", error);
+      console.error("Could not load menu data from Firestore:", error);
       showMessage('無法從資料庫載入菜單。', 'error');
       setLoading(prev => ({ ...prev, menu: false }));
     });
 
     return () => unsubscribe();
-  }, [db]);
+  }, [db, userId]);
 
-  // 監聽 Firebase 訂單資料
+  // Listen to orders data from Firebase
   useEffect(() => {
-    if (!db) return;
+    if (!db || !userId) return;
     const ordersRef = collection(db, `artifacts/${appId}/public/data/orders`);
     const q = query(ordersRef);
 
@@ -96,21 +114,21 @@ const App = () => {
       setOrders(fetchedOrders);
       setLoading(prev => ({ ...prev, orders: false }));
     }, (error) => {
-      console.error("無法從 Firestore 載入訂單資料:", error);
+      console.error("Could not load orders data from Firestore:", error);
       showMessage('無法從資料庫載入訂單。', 'error');
       setLoading(prev => ({ ...prev, orders: false }));
     });
 
     return () => unsubscribe();
-  }, [db]);
+  }, [db, userId]);
 
-  // 顯示狀態訊息
+  // Display status message
   const showMessage = (text, type) => {
     setMessage({ text, type });
     setTimeout(() => setMessage({ text: '', type: '' }), 3000);
   };
 
-  // 彈出視窗相關功能
+  // Modal-related functions
   const openModal = (item = null) => {
     setCurrentMenuItem(item);
     setIsModalOpen(true);
@@ -123,20 +141,21 @@ const App = () => {
 
   const handleConfirm = (action) => {
     setCurrentConfirmAction(action);
-    setIsConfirmModalOpen(true);
+    setIsConfirmModal(true);
   };
 
   const handleConfirmAction = async (isConfirmed) => {
     if (isConfirmed && currentConfirmAction) {
       await currentConfirmAction.action();
     }
-    setIsConfirmModalOpen(false);
+    setIsConfirmModal(false);
     setCurrentConfirmAction(null);
   };
   
-  // 處理新增/編輯表單提交
+  // Handle form submission for adding/editing items
   const handleFormSubmit = async (event) => {
     event.preventDefault();
+    if (!db) return;
     setIsUploading(true);
 
     const form = event.target;
@@ -155,35 +174,37 @@ const App = () => {
       return;
     }
 
-    let imageUrl = currentMenuItem?.圖片 || '';
+    let imageUrl = currentMenuItem?.['圖片'] || '';
 
-    // 如果有上傳新圖片檔案
+    // If a new image file is uploaded, upload to Cloudinary
     if (imageFile && imageFile.size > 0) {
+      const cloudinaryFormData = new FormData();
+      cloudinaryFormData.append('file', imageFile);
+      cloudinaryFormData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
       try {
-        // 如果是編輯模式，先刪除舊圖片
-        if (id && currentMenuItem?.圖片) {
-          try {
-            const oldImageRef = ref(storage, currentMenuItem.圖片);
-            await deleteObject(oldImageRef);
-          } catch (storageError) {
-            console.warn("無法刪除舊圖片，可能是不存在的 URL 或權限問題:", storageError);
-          }
+        const response = await fetch(CLOUDINARY_API_URL, {
+          method: 'POST',
+          body: cloudinaryFormData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(`Cloudinary 上傳失敗: ${errorData.error.message}`);
         }
-        
-        // 上傳新圖片
-        const storageRef = ref(storage, `menu_images/${Date.now()}_${imageFile.name}`);
-        await uploadBytes(storageRef, imageFile);
-        imageUrl = await getDownloadURL(storageRef);
+
+        const data = await response.json();
+        imageUrl = data.secure_url;
         showMessage('圖片已成功上傳！', 'success');
       } catch (error) {
-        console.error("圖片上傳失敗:", error);
-        showMessage('圖片上傳失敗，請稍後再試。', 'error');
+        console.error("Image upload failed:", error);
+        showMessage(`圖片上傳失敗，請檢查 Cloudinary 設定。錯誤: ${error.message}`, 'error');
         setIsUploading(false);
         return;
       }
     }
     
-    // 更新或新增 Firestore 資料
+    // Update or add Firestore data
     const itemData = {
       '大分類': finalMajorCategory,
       '餐點編號': formData.get('item-code'),
@@ -203,7 +224,7 @@ const App = () => {
         showMessage('品項已成功新增！', 'success');
       }
     } catch (error) {
-      console.error("儲存品項時發生錯誤:", error);
+      console.error("Error saving item:", error);
       showMessage('儲存品項時發生錯誤。', 'error');
     }
     
@@ -211,7 +232,7 @@ const App = () => {
     closeModal();
   };
 
-  // 處理菜單品項的拖曳排序
+  // Handle drag-and-drop for menu item sorting
   const handleDragStart = (e, draggedItem) => {
     e.dataTransfer.setData('text/plain', draggedItem.id);
     e.currentTarget.classList.add('dragging');
@@ -236,16 +257,15 @@ const App = () => {
     e.currentTarget.classList.remove('dragging');
   };
   
-  // 觸控拖曳邏輯 (簡化版，僅為示意)
+  // Touch drag logic (simplified, for placeholder)
   const handleTouchStart = (e, item) => {
-    // 實際應用需要更複雜的邏輯來處理長按、拖曳和放置
-    // 這裡只是預留接口，確保不會因為觸控而報錯
+    // A more complex logic for long-press, drag, and drop is needed here
     console.log("Touch started on item:", item.id);
   };
   
-  // 儲存排序到 Firestore
+  // Save sorting order to Firestore
   const handleSaveOrder = async () => {
-    if (menuItems.length === 0) {
+    if (!db || menuItems.length === 0) {
       showMessage('沒有可以儲存的資料。', 'error');
       return;
     }
@@ -260,14 +280,14 @@ const App = () => {
       await batch.commit();
       showMessage('菜單順序已成功儲存！', 'success');
     } catch (error) {
-      console.error('儲存排序時發生錯誤:', error);
+      console.error('Error saving order:', error);
       showMessage('儲存排序時發生錯誤，請稍後再試。', 'error');
     }
   };
 
-  // 新增測試訂單
+  // Add a test order
   const handleAddOrder = async () => {
-    if (menuItems.length === 0) {
+    if (!db || menuItems.length === 0) {
       showMessage('請先新增菜單品項，才能新增測試訂單。', 'error');
       return;
     }
@@ -277,36 +297,40 @@ const App = () => {
       qty: Math.floor(Math.random() * 3) + 1
     }));
     const total = items.reduce((sum, item) => sum + (item.qty * (menuItems.find(menuItem => menuItem['品項'] === item.name)?.['價格'] || 0)), 0);
+    const tableNumber = Math.floor(Math.random() * 20) + 1; // Generate a random table number
     const orderData = {
       items,
       total,
       status: '進行中',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      tableNumber // Add table number to the order data
     };
     try {
       await addDoc(collection(db, `artifacts/${appId}/public/data/orders`), orderData);
       showMessage('已新增測試訂單！', 'success');
     } catch (error) {
-      console.error('新增訂單失敗:', error);
+      console.error('Failed to add order:', error);
       showMessage('新增訂單失敗。', 'error');
     }
   };
 
-  // 標記訂單為已完成
+  // Mark an order as complete
   const completeOrder = async (id) => {
+    if (!db) return;
     try {
       await updateDoc(doc(db, `artifacts/${appId}/public/data/orders`, id), {
         status: '已完成'
       });
       showMessage('訂單已標記為已完成！', 'success');
     } catch (error) {
-      console.error('更新訂單失敗:', error);
+      console.error('Failed to update order:', error);
       showMessage('更新訂單失敗。', 'error');
     }
   };
 
-  // 刪除訂單
+  // Delete an order
   const deleteOrder = async (id) => {
+    if (!db) return;
     handleConfirm({
       message: '您確定要刪除這筆訂單嗎？',
       action: async () => {
@@ -314,46 +338,44 @@ const App = () => {
           await deleteDoc(doc(db, `artifacts/${appId}/public/data/orders`, id));
           showMessage('訂單已刪除！', 'success');
         } catch (error) {
-          console.error('刪除訂單失敗:', error);
+          console.error('Failed to delete order:', error);
           showMessage('刪除訂單失敗。', 'error');
         }
       }
     });
   };
 
-  // 刪除菜單品項
+  // Delete a menu item
   const deleteItem = async (id) => {
+    if (!db) return;
     handleConfirm({
       message: '您確定要刪除這個品項嗎？此操作無法復原。',
       action: async () => {
         try {
-          const itemToDelete = menuItems.find(item => item.id === id);
-          if (itemToDelete && itemToDelete['圖片']) {
-            try {
-              const oldImageRef = ref(storage, itemToDelete['圖片']);
-              await deleteObject(oldImageRef);
-            } catch (storageError) {
-              console.warn("無法刪除儲存空間中的圖片，可能是不存在的 URL 或權限問題:", storageError);
-            }
-          }
           await deleteDoc(doc(db, `artifacts/${appId}/public/data/menu_items`, id));
           showMessage('品項已成功刪除！', 'success');
         } catch (error) {
-          console.error("刪除文件時發生錯誤:", error);
+          console.error("Error deleting document:", error);
           showMessage('刪除品項時發生錯誤。', 'error');
         }
       }
     });
   };
 
-  // 取得不重複的分類
+  // Get unique categories
   const categories = ['all', ...new Set(menuItems.map(item => item['大分類']))].sort();
   const filteredMenuItems = activeCategory === 'all'
     ? menuItems
     : menuItems.filter(item => item['大分類'] === activeCategory);
     
-  // 初始資料上傳（如果資料庫為空）
-  const uploadInitialData = async () => {
+  // Initial data upload (if database is empty)
+  const uploadInitialData = async (firestore) => {
+    const checkRef = collection(firestore, `artifacts/${appId}/public/data/menu_items`);
+    const checkSnapshot = await getDocs(checkRef);
+    if (!checkSnapshot.empty) {
+        return; // Data already exists
+    }
+    
     const csvData = `大分類,品項,價格,圖片,餐點編號
 熱門,漢堡肉芝士蛋堡+紅茶,70,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,A
 熱門,火腿芝士蛋吐司+紅茶,60,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,B
@@ -372,7 +394,7 @@ const App = () => {
 套餐,火腿芝士蛋吐司+紅茶,60,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,2
 飲料,古早味紅茶,25,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,1
 飲料,鮮奶茶,40,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,2`;
-            
+              
     const lines = csvData.split('\n');
     const headers = lines[0].split(',').map(h => h.trim());
     const itemsToUpload = [];
@@ -383,21 +405,21 @@ const App = () => {
             headers.forEach((header, index) => {
                 item[header] = (header === '價格') ? parseFloat(values[index]) : values[index];
             });
-            item.sortOrder = i - 1; 
+            item.sortOrder = i - 1;
             itemsToUpload.push(item);
         }
     }
-    const batch = writeBatch(db);
+    const batch = writeBatch(firestore);
     itemsToUpload.forEach(item => {
-      const docRef = doc(collection(db, `artifacts/${appId}/public/data/menu_items`));
+      const docRef = doc(collection(firestore, `artifacts/${appId}/public/data/menu_items`));
       batch.set(docRef, item);
     });
 
     try {
       await batch.commit();
-      console.log("初始資料已批量上傳。");
+      console.log("Initial data uploaded in a batch.");
     } catch (error) {
-      console.error("上傳初始資料時發生錯誤:", error);
+      console.error("Error uploading initial data:", error);
     }
   };
 
@@ -405,26 +427,89 @@ const App = () => {
     <div className="bg-gray-100 flex items-center justify-center p-2 sm:p-4 min-h-screen font-inter">
       <div className="bg-white p-4 sm:p-6 md:p-10 rounded-2xl md:rounded-3xl shadow-2xl w-full max-w-7xl overflow-hidden">
         
-        {/* 頂部導航與標題 */}
+        {/* Top navigation and title */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 md:mb-6 pb-2 md:pb-4">
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-800 mb-2 md:mb-0">早餐店後台管理系統</h1>
           <div className="flex space-x-1 sm:space-x-2 bg-gray-200 p-1 rounded-full text-sm sm:text-base">
-            <button
-              onClick={() => setActiveTab('menu')}
-              className={`py-2 px-4 sm:px-6 rounded-full font-semibold transition-colors duration-300 ${activeTab === 'menu' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-300'}`}
-            >
-              菜單管理
-            </button>
             <button
               onClick={() => setActiveTab('orders')}
               className={`py-2 px-4 sm:px-6 rounded-full font-semibold transition-colors duration-300 ${activeTab === 'orders' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-300'}`}
             >
               訂單管理
             </button>
+            <button
+              onClick={() => setActiveTab('menu')}
+              className={`py-2 px-4 sm:px-6 rounded-full font-semibold transition-colors duration-300 ${activeTab === 'menu' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-300'}`}
+            >
+              菜單管理
+            </button>
           </div>
         </div>
 
-        {/* 菜單管理頁籤內容 */}
+        {/* Order Management Tab Content */}
+        {activeTab === 'orders' && (
+          <div className="active-view">
+            <div className="flex flex-wrap justify-end gap-2 sm:gap-4 mb-4 sm:mb-6">
+              <button
+                onClick={handleAddOrder}
+                className="flex-grow sm:flex-grow-0 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 sm:px-6 rounded-xl transition duration-300 transform hover:scale-105 shadow-md text-sm sm:text-base"
+              >
+                <i className="fas fa-shopping-cart mr-2"></i>新增測試訂單
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              {(loading.orders || loading.auth) ? (
+                  <div className="min-h-[300px] flex items-center justify-center text-center text-gray-500">
+                      <i className="fas fa-spinner fa-spin text-blue-600 text-3xl mb-2"></i>
+                      <p className="mt-2 text-lg">載入訂單中...</p>
+                  </div>
+              ) : (
+                <table className="min-w-full divide-y divide-gray-200 rounded-xl overflow-hidden">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      {['桌號', '訂單時間', '總金額', '狀態', '訂單內容', '操作'].map(header => (
+                        <th key={header} scope="col" className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{header}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {orders.length === 0 ? (
+                      <tr>
+                        <td colSpan="6" className="px-6 py-4 text-center text-gray-500">目前沒有訂單</td>
+                      </tr>
+                    ) : (
+                      orders.map(order => (
+                        <tr key={order.id} className="hover:bg-gray-50 transition duration-150">
+                          <td className="px-3 py-2 sm:px-6 sm:py-4 text-sm text-gray-900 font-mono">{order.tableNumber}</td>
+                          <td className="px-3 py-2 sm:px-6 sm:py-4 text-sm text-gray-900 font-mono">{new Date(order.timestamp).toLocaleString()}</td>
+                          <td className="px-3 py-2 sm:px-6 sm:py-4 text-sm text-gray-900 font-semibold">NT$ {order.total}</td>
+                          <td className="px-3 py-2 sm:px-6 sm:py-4 text-sm">
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${order.status === '已完成' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                              {order.status}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 sm:px-6 sm:py-4 text-sm text-gray-500">
+                            {order.items.map(item => `${item.name} x${item.qty}`).join(', ')}
+                          </td>
+                          <td className="px-3 py-2 sm:px-6 sm:py-4 text-sm font-medium space-x-2">
+                            <button onClick={() => completeOrder(order.id)} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-1 px-3 rounded-lg transition duration-300 transform hover:scale-105">
+                              完成
+                            </button>
+                            <button onClick={() => deleteOrder(order.id)} className="bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-lg transition duration-300 transform hover:scale-105">
+                              刪除
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Menu Management Tab Content */}
         {activeTab === 'menu' && (
           <div className="active-view">
             <div className="flex flex-wrap gap-2 mb-4 sm:mb-6">
@@ -453,7 +538,7 @@ const App = () => {
               </button>
             </div>
             <div className="overflow-x-auto">
-              {loading.menu ? (
+              {(loading.menu || loading.auth) ? (
                 <div className="min-h-[300px] flex items-center justify-center text-center text-gray-500">
                   <i className="fas fa-spinner fa-spin text-blue-600 text-3xl mb-2"></i>
                   <p className="mt-2 text-lg">載入菜單中...</p>
@@ -473,92 +558,40 @@ const App = () => {
                         <td colSpan="7" className="px-6 py-4 text-center text-gray-500">此分類目前沒有菜單品項</td>
                       </tr>
                     ) : (
-                      filteredMenuItems.map((item, index) => (
-                        <tr
-                          key={item.id}
-                          className="hover:bg-gray-50 transition duration-150 cursor-move table-row"
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, item)}
-                          onDragEnd={handleDragEnd}
-                          onDrop={(e) => handleDragOver(e, item)}
-                          onTouchStart={(e) => handleTouchStart(e, item)}
-                        >
-                          <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-900">{index + 1}</td>
-                          <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
-                            <img src={item['圖片']} alt={item['品項']} className="h-12 w-12 sm:h-16 sm:w-16 rounded-lg object-cover shadow-sm" onError={(e) => { e.target.src='https://placehold.co/64x64/E5E7EB/9CA3AF?text=No+Image'; e.target.alt='無圖片'; }} />
-                          </td>
-                          <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-900">{item['大分類']}</td>
-                          <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-900">{item['餐點編號'] || '-'}</td>
-                          <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item['品項']}</td>
-                          <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-900">NT$ {item['價格']}</td>
-                          <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm font-medium">
-                            <button onClick={() => openModal(item)} className="text-blue-600 hover:text-blue-900 transition duration-150 transform hover:scale-105 mr-2">編輯</button>
-                            <button onClick={() => deleteItem(item.id)} className="text-red-600 hover:text-red-900 transition duration-150 transform hover:scale-105">刪除</button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-        )}
-        
-        {/* 訂單管理頁籤內容 */}
-        {activeTab === 'orders' && (
-          <div className="active-view">
-            <div className="flex flex-wrap justify-end gap-2 sm:gap-4 mb-4 sm:mb-6">
-              <button
-                onClick={handleAddOrder}
-                className="flex-grow sm:flex-grow-0 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 sm:px-6 rounded-xl transition duration-300 transform hover:scale-105 shadow-md text-sm sm:text-base"
-              >
-                <i className="fas fa-shopping-cart mr-2"></i>新增測試訂單
-              </button>
-            </div>
-            <div className="overflow-x-auto">
-              {loading.orders ? (
-                 <div className="min-h-[300px] flex items-center justify-center text-center text-gray-500">
-                    <i className="fas fa-spinner fa-spin text-blue-600 text-3xl mb-2"></i>
-                    <p className="mt-2 text-lg">載入訂單中...</p>
-                 </div>
-              ) : (
-                <table className="min-w-full divide-y divide-gray-200 rounded-xl overflow-hidden">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      {['訂單編號', '總金額', '狀態', '訂單內容', '操作'].map(header => (
-                        <th key={header} scope="col" className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{header}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {orders.length === 0 ? (
-                      <tr>
-                        <td colSpan="5" className="px-6 py-4 text-center text-gray-500">目前沒有訂單</td>
-                      </tr>
-                    ) : (
-                      orders.map(order => (
-                        <tr key={order.id} className="hover:bg-gray-50 transition duration-150">
-                          <td className="px-3 py-2 sm:px-6 sm:py-4 text-sm text-gray-900 font-mono">{order.id.slice(0, 8)}...</td>
-                          <td className="px-3 py-2 sm:px-6 sm:py-4 text-sm text-gray-900 font-semibold">NT$ {order.total}</td>
-                          <td className="px-3 py-2 sm:px-6 sm:py-4 text-sm">
-                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${order.status === '已完成' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                              {order.status}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 sm:px-6 sm:py-4 text-sm text-gray-500">
-                            {order.items.map(item => `${item.name} x${item.qty}`).join(', ')}
-                          </td>
-                          <td className="px-3 py-2 sm:px-6 sm:py-4 text-sm font-medium">
-                            <button onClick={() => completeOrder(order.id)} className="text-green-600 hover:text-green-900 transition duration-150 transform hover:scale-105 mr-2 text-sm sm:text-base">
-                              <i className="fas fa-check-circle"></i> 完成
-                            </button>
-                            <button onClick={() => deleteOrder(order.id)} className="text-red-600 hover:text-red-900 transition duration-150 transform hover:scale-105 text-sm sm:text-base">
-                              <i className="fas fa-trash"></i> 刪除
-                            </button>
-                          </td>
-                        </tr>
-                      ))
+                      filteredMenuItems.map((item, index) => {
+                        return (
+                          <tr
+                            key={item.id}
+                            className="hover:bg-gray-50 transition duration-150 cursor-move table-row"
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, item)}
+                            onDragEnd={handleDragEnd}
+                            onDrop={(e) => handleDragOver(e, item)}
+                            onTouchStart={(e) => handleTouchStart(e, item)}
+                          >
+                            <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-900">{index + 1}</td>
+                            <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+                              {item['圖片'] ? (
+                                <img
+                                  src={item['圖片']}
+                                  alt={item['品項']}
+                                  className="h-12 w-12 sm:h-16 sm:w-16 rounded-lg object-cover shadow-sm"
+                                />
+                              ) : (
+                                <img src='https://placehold.co/64x64/E5E7EB/9CA3AF?text=No+Image' alt='無圖片' className="h-12 w-12 sm:h-16 sm:w-16 rounded-lg object-cover shadow-sm" />
+                              )}
+                            </td>
+                            <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-900">{item['大分類']}</td>
+                            <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-900">{item['餐點編號'] || '-'}</td>
+                            <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item['品項']}</td>
+                            <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-900">NT$ {item['價格']}</td>
+                            <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm font-medium">
+                              <button onClick={() => openModal(item)} className="text-blue-600 hover:text-blue-900 transition duration-150 transform hover:scale-105 mr-2">編輯</button>
+                              <button onClick={() => deleteItem(item.id)} className="text-red-600 hover:text-red-900 transition duration-150 transform hover:scale-105">刪除</button>
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
@@ -567,7 +600,7 @@ const App = () => {
           </div>
         )}
 
-        {/* 狀態訊息容器 */}
+        {/* Status message container */}
         {message.text && (
           <div className={`mt-4 sm:mt-6 p-4 rounded-xl font-semibold ${message.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
             {message.text}
@@ -576,7 +609,7 @@ const App = () => {
 
       </div>
 
-      {/* 新增/編輯品項的彈出視窗 (Modal) */}
+      {/* Modal for adding/editing items */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white p-6 md:p-8 rounded-2xl shadow-xl w-full max-w-lg transform transition-all duration-300 scale-100 opacity-100">
@@ -618,21 +651,14 @@ const App = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700">圖片上傳</label>
                 <label htmlFor="image-upload" className="mt-1 inline-block bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-xl transition duration-300 transform hover:scale-105 cursor-pointer">
-                  {isUploading ? (
-                    <>
-                      <i className="fas fa-spinner fa-spin mr-2"></i>上傳中...
-                    </>
-                  ) : (
-                    <>
-                      <i className="fas fa-upload mr-2"></i>上傳圖片
-                    </>
-                  )}
+                  <i className={`fas fa-spinner fa-spin mr-2 ${isUploading ? '' : 'hidden'}`}></i>
+                  {isUploading ? '上傳中...' : '選擇或上傳圖片'}
                 </label>
                 <input type="file" name="image-upload" id="image-upload" accept="image/*" className="hidden" />
                 <p className="text-xs text-gray-500 mt-1">請上傳圖片檔案 (JPG, PNG等)</p>
-                {(currentMenuItem?.['圖片'] || isUploading) && (
+                {currentMenuItem?.['圖片'] && (
                   <div className="mt-2">
-                    <img src={currentMenuItem?.['圖片']} alt="Image Preview" className="h-24 w-24 rounded-lg object-cover shadow-sm" />
+                    <img src={currentMenuItem['圖片']} alt="Image Preview" className="h-24 w-24 rounded-lg object-cover shadow-sm" />
                     <p className="text-xs text-gray-400 mt-1">目前圖片預覽</p>
                   </div>
                 )}
@@ -641,9 +667,8 @@ const App = () => {
                 <button type="button" onClick={closeModal} className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105">
                   取消
                 </button>
-                <button type="submit" disabled={isUploading} className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105">
+                <button type="submit" disabled={isUploading} className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
                   <i className={`fas fa-save mr-2 ${isUploading ? 'hidden' : ''}`}></i>
-                  <i className={`fas fa-spinner fa-spin mr-2 ${isUploading ? '' : 'hidden'}`}></i>
                   儲存
                 </button>
               </div>
@@ -652,7 +677,7 @@ const App = () => {
         </div>
       )}
 
-      {/* 刪除確認的彈出視窗 */}
+      {/* Confirmation modal for deletion */}
       {isConfirmModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white p-6 md:p-8 rounded-2xl shadow-xl w-full max-w-sm">
