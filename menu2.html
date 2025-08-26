@@ -4,171 +4,82 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>早餐店後台管理系統</title>
-    <!-- 使用 Inter 字體 -->
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-    <!-- 引入 Tailwind CSS CDN -->
+    <!-- 引入 Tailwind CSS 確保響應式設計和美觀 -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入 Font Awesome for icons -->
+    <!-- 引入 Font Awesome 顯示圖標 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- 引入 Google Fonts 的 Noto Sans TC 確保中文字體顯示正常 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Noto Sans TC', sans-serif;
             background-color: #f3f4f6;
         }
-        /* 自定義滾動條樣式 */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #e5e7eb;
-            border-radius: 10px;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #9ca3af;
-            border-radius: 10px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #6b7280;
-        }
-        /* 拖曳中物件的樣式 (適用於滑鼠) */
-        .dragging {
+        .table-row.dragging {
             opacity: 0.5;
-            background-color: #e2e8f0;
-        }
-        /* 觸控拖曳中物件的樣式 */
-        .touch-dragging {
-            position: fixed; /* 固定在視口中 */
-            pointer-events: none; /* 避免觸發額外事件 */
-            z-index: 1000;
-            opacity: 0.8;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            transform: rotate(2deg); /* 視覺效果 */
-            border-radius: 12px;
-            width: auto;
-            max-width: 80%;
-            transition: none; /* 避免拖曳時有奇怪的動畫 */
-        }
-        /* 拖曳放置目標的樣式 */
-        .drag-over {
-            border-top: 2px solid #3b82f6;
-        }
-        /* 針對行動裝置，表格列高度增加以方便點擊 */
-        .table-row {
-            padding-top: 0.75rem; /* 增加上下間距 */
-            padding-bottom: 0.75rem;
-        }
-        @media (min-width: 768px) {
-            .table-row {
-                padding-top: 1rem;
-                padding-bottom: 1rem;
-            }
         }
     </style>
 </head>
-<body class="bg-gray-100 flex items-center justify-center p-2 sm:p-4 min-h-screen">
-
-    <!-- 主容器 -->
-    <div id="main-content" class="bg-white p-4 sm:p-6 md:p-10 rounded-2xl md:rounded-3xl shadow-2xl w-full max-w-7xl overflow-hidden">
+<body class="p-2 sm:p-4 min-h-screen">
+    <div class="bg-white p-4 sm:p-6 md:p-10 rounded-2xl md:rounded-3xl shadow-2xl w-full max-w-7xl mx-auto overflow-hidden">
         
-        <!-- 頂部導航與標題 -->
+        <!-- Top navigation and title -->
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 md:mb-6 pb-2 md:pb-4">
-            <!-- 針對手機調整標題大小 -->
             <h1 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-800 mb-2 md:mb-0">早餐店後台管理系統</h1>
-            
-            <!-- 頁籤導航 -->
             <div class="flex space-x-1 sm:space-x-2 bg-gray-200 p-1 rounded-full text-sm sm:text-base">
-                <button id="show-menu-btn" class="py-2 px-4 sm:px-6 rounded-full font-semibold transition-colors duration-300 bg-blue-600 text-white">菜單管理</button>
-                <button id="show-orders-btn" class="py-2 px-4 sm:px-6 rounded-full font-semibold transition-colors duration-300 text-gray-700 hover:bg-gray-300">訂單管理</button>
+                <button id="orders-tab" class="py-2 px-4 sm:px-6 rounded-full font-semibold transition-colors duration-300 bg-blue-600 text-white">
+                    訂單管理
+                </button>
+                <button id="menu-tab" class="py-2 px-4 sm:px-6 rounded-full font-semibold transition-colors duration-300 text-gray-700 hover:bg-gray-300">
+                    菜單管理
+                </button>
             </div>
         </div>
 
-        <!-- 菜單管理頁籤內容 -->
-        <div id="menu-view" class="active-view">
-            <!-- 分類導航 -->
-            <div id="category-tabs" class="flex flex-wrap gap-2 mb-4 sm:mb-6">
-                <!-- 分類按鈕將在此處由 JavaScript 動態生成 -->
-            </div>
-
-            <div class="flex flex-wrap justify-end gap-2 sm:gap-4 mb-4 sm:mb-6">
-                <button id="save-order-btn" class="flex-grow sm:flex-grow-0 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 sm:px-6 rounded-xl transition duration-300 transform hover:scale-105 shadow-md text-sm sm:text-base">
-                    <i class="fas fa-save mr-2"></i>儲存排序
-                </button>
-                <button id="add-item-btn" class="flex-grow sm:flex-grow-0 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 sm:px-6 rounded-xl transition duration-300 transform hover:scale-105 shadow-md text-sm sm:text-base">
-                    <i class="fas fa-plus-circle mr-2"></i>新增品項
-                </button>
-            </div>
-            <!-- 在小螢幕上啟用水平滾動 -->
-            <div class="overflow-x-auto">
-                <div id="menu-list" class="min-h-[300px] flex items-center justify-center">
-                    <div id="loading-spinner-menu" class="text-center text-gray-500 hidden">
-                        <i class="fas fa-spinner fa-spin text-blue-600 text-3xl mb-2"></i>
-                        <p class="mt-2 text-lg">載入菜單中...</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- 訂單管理頁籤內容 -->
-        <div id="orders-view" class="hidden">
-             <div class="flex flex-wrap justify-end gap-2 sm:gap-4 mb-4 sm:mb-6">
-                <button id="add-order-btn" class="flex-grow sm:flex-grow-0 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 sm:px-6 rounded-xl transition duration-300 transform hover:scale-105 shadow-md text-sm sm:text-base">
-                    <i class="fas fa-shopping-cart mr-2"></i>新增測試訂單
-                </button>
-            </div>
-            <!-- 在小螢幕上啟用水平滾動 -->
-            <div class="overflow-x-auto">
-                <div id="orders-list" class="min-h-[300px] flex items-center justify-center">
-                    <div id="loading-spinner-orders" class="text-center text-gray-500 hidden">
-                        <i class="fas fa-spinner fa-spin text-blue-600 text-3xl mb-2"></i>
-                        <p class="mt-2 text-lg">載入訂單中...</p>
-                    </div>
-                </div>
-            </div>
+        <!-- Main content area -->
+        <div id="content-area">
+            <!-- Content will be dynamically injected here -->
         </div>
 
-        <!-- 狀態訊息容器 -->
+        <!-- Status message container -->
         <div id="message-container" class="mt-4 sm:mt-6"></div>
+
     </div>
 
-    <!-- 新增/編輯品項的彈出視窗 (Modal) -->
-    <div id="item-modal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-xl w-full max-w-lg transform transition-all duration-300 scale-95 opacity-0" id="modal-content">
+    <!-- Modal for adding/editing items -->
+    <div id="item-modal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-xl w-full max-w-lg transform transition-all duration-300 scale-100 opacity-100">
             <h2 id="modal-title" class="text-2xl font-bold text-gray-800 mb-6">新增菜單品項</h2>
             <form id="item-form" class="space-y-4">
-                <input type="hidden" id="item-id">
+                <input type="hidden" id="item-id" name="itemId" />
                 <div>
                     <label for="major-category-select" class="block text-sm font-medium text-gray-700">大分類</label>
-                    <select id="major-category-select" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                        <!-- 選項由 JS 動態生成 -->
-                    </select>
-                    <input type="text" id="major-category-input" placeholder="或輸入新分類" class="mt-2 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    <select id="major-category-select" name="major-category-select" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"></select>
+                    <input type="text" id="major-category-input" name="major-category-input" placeholder="或輸入新分類" class="mt-2 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
                 </div>
                 <div>
-                    <label for="minor-category" class="block text-sm font-medium text-gray-700">中分類</label>
-                    <input type="text" id="minor-category" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    <label for="item-code" class="block text-sm font-medium text-gray-700">餐點編號</label>
+                    <input type="text" id="item-code" name="item-code" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
                 </div>
                 <div>
                     <label for="item-name" class="block text-sm font-medium text-gray-700">品項</label>
-                    <input type="text" id="item-name" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    <input type="text" id="item-name" name="item-name" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
                 </div>
                 <div>
                     <label for="price" class="block text-sm font-medium text-gray-700">價格</label>
-                    <input type="number" id="price" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    <input type="number" id="price" name="price" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
                 </div>
                 <div>
-                    <label for="image-upload" class="block text-sm font-medium text-gray-700">圖片上傳</label>
-                    <input type="file" id="image-upload" accept="image/*" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                    <p class="text-xs text-gray-500 mt-1">請上傳圖片檔案 (JPG, PNG等)</p>
-                    <div id="image-preview" class="mt-2 hidden">
-                        <img src="" alt="Image Preview" class="h-24 w-24 rounded-lg object-cover shadow-sm">
-                        <p class="text-xs text-gray-400 mt-1">預覽</p>
-                    </div>
+                    <label for="image-url" class="block text-sm font-medium text-gray-700">圖片網址</label>
+                    <input type="url" id="image-url" name="image-url" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
                 </div>
                 <div class="flex justify-end space-x-4 pt-4">
                     <button type="button" id="close-modal-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105">
                         取消
                     </button>
-                    <button type="submit" id="save-btn" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105">
+                    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105">
                         <i class="fas fa-save mr-2"></i>儲存
                     </button>
                 </div>
@@ -176,805 +87,201 @@
         </div>
     </div>
 
-    <!-- 刪除確認的彈出視窗 -->
-    <div id="confirm-modal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-xl w-full max-w-sm" id="confirm-content">
-            <p class="text-center text-lg font-semibold text-gray-800 mb-6" id="confirm-message">您確定要刪除這個品項嗎？</p>
+    <!-- Confirmation modal for deletion -->
+    <div id="confirm-modal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-xl w-full max-w-sm">
+            <p id="confirm-message" class="text-center text-lg font-semibold text-gray-800 mb-6"></p>
             <div class="flex justify-center space-x-4">
-                <button id="confirm-cancel-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105">
+                <button id="cancel-confirm-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105">
                     取消
                 </button>
-                <button id="confirm-delete-btn" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105">
+                <button id="confirm-action-btn" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105">
                     刪除
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- 引入 Firebase SDKs -->
+    <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { 
-            getFirestore, 
-            collection, 
-            doc, 
-            onSnapshot, 
-            addDoc, 
-            updateDoc, 
-            deleteDoc, 
-            query,
-            getDocs,
-            writeBatch
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
-        
-        // 全域變數
-        let db, storage, menuRef, ordersRef;
-        const appId = 'bkft'; // 硬編碼的 App ID
-        let currentCategory = 'all'; // 預設顯示所有品項
-        let allMenuData = []; // 儲存所有菜單資料
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc, query, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // DOM 元素
-        const menuViewEl = document.getElementById('menu-view');
-        const ordersViewEl = document.getElementById('orders-view');
-        const showMenuBtn = document.getElementById('show-menu-btn');
-        const showOrdersBtn = document.getElementById('show-orders-btn');
-        const categoryTabsEl = document.getElementById('category-tabs');
-        const menuListEl = document.getElementById('menu-list');
-        const ordersListEl = document.getElementById('orders-list');
-        const addOrderBtn = document.getElementById('add-order-btn');
-        const modalEl = document.getElementById('item-modal');
-        const modalContentEl = document.getElementById('modal-content');
-        const modalTitleEl = document.getElementById('modal-title');
-        const formEl = document.getElementById('item-form');
+        // Global variables for Firebase and state
+        let app, db, auth, userId;
+        let menuItems = [];
+        let orders = [];
+        let activeTab = 'orders';
+        let activeCategory = 'all';
+        let draggedItem = null;
+        let confirmAction = null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // UI Elements
+        const ordersTabBtn = document.getElementById('orders-tab');
+        const menuTabBtn = document.getElementById('menu-tab');
+        const contentArea = document.getElementById('content-area');
+        const messageContainer = document.getElementById('message-container');
+        const itemModal = document.getElementById('item-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const itemForm = document.getElementById('item-form');
         const itemIdInput = document.getElementById('item-id');
         const majorCategorySelect = document.getElementById('major-category-select');
         const majorCategoryInput = document.getElementById('major-category-input');
-        const minorCategoryInput = document.getElementById('minor-category');
+        const itemCodeInput = document.getElementById('item-code');
         const itemNameInput = document.getElementById('item-name');
         const priceInput = document.getElementById('price');
-        const imageUploadInput = document.getElementById('image-upload');
-        const imagePreviewEl = document.getElementById('image-preview');
-        const imagePreviewImg = imagePreviewEl.querySelector('img');
-        const messageContainerEl = document.getElementById('message-container');
-        const loadingSpinnerMenu = document.getElementById('loading-spinner-menu');
-        const loadingSpinnerOrders = document.getElementById('loading-spinner-orders');
-        const saveBtn = document.getElementById('save-btn');
+        const imageUrlInput = document.getElementById('image-url');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const confirmModal = document.getElementById('confirm-modal');
+        const confirmMessage = document.getElementById('confirm-message');
+        const cancelConfirmBtn = document.getElementById('cancel-confirm-btn');
+        const confirmActionBtn = document.getElementById('confirm-action-btn');
 
-        // 處理刪除確認的彈出視窗
-        const confirmModalEl = document.getElementById('confirm-modal');
-        const confirmCancelBtn = document.getElementById('confirm-cancel-btn');
-        const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
-        let confirmResolver;
-
-        function showConfirm(message) {
-            document.getElementById('confirm-message').textContent = message;
-            confirmModalEl.classList.remove('hidden');
-            return new Promise((resolve) => {
-                confirmResolver = resolve;
-            });
-        }
-        confirmCancelBtn.addEventListener('click', () => {
-            confirmModalEl.classList.add('hidden');
-            confirmResolver(false);
-        });
-        confirmDeleteBtn.addEventListener('click', () => {
-            confirmModalEl.classList.add('hidden');
-            confirmResolver(true);
-        });
-
-        // 顯示狀態訊息
-        function showMessage(message, type = 'success') {
-            const messageClasses = type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700';
-            const messageEl = document.createElement('div');
-            messageEl.className = `p-4 rounded-xl font-semibold mb-4 ${messageClasses}`;
-            messageEl.textContent = message;
-            messageContainerEl.innerHTML = '';
-            messageContainerEl.appendChild(messageEl);
-            setTimeout(() => { messageEl.remove(); }, 3000);
-        }
-
-        // 渲染分類導航按鈕
-        function renderCategories(categories) {
-            categoryTabsEl.innerHTML = ''; // 清空現有按鈕
-
-            // 創建「所有品項」按鈕
-            const allBtn = document.createElement('button');
-            allBtn.textContent = '所有品項';
-            allBtn.dataset.category = 'all';
-            // 針對手機調整按鈕大小
-            allBtn.className = `py-2 px-4 rounded-full font-semibold transition-colors duration-300 text-sm sm:text-base`;
-            categoryTabsEl.appendChild(allBtn);
-
-            // 創建各分類按鈕
-            categories.forEach(category => {
-                const btn = document.createElement('button');
-                btn.textContent = category;
-                btn.dataset.category = category;
-                // 針對手機調整按鈕大小
-                btn.className = `py-2 px-4 rounded-full font-semibold transition-colors duration-300 text-sm sm:text-base`;
-                categoryTabsEl.appendChild(btn);
-            });
-
-            // 綁定點擊事件
-            categoryTabsEl.querySelectorAll('button').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    currentCategory = btn.dataset.category;
-                    updateCategoryButtons();
-                    renderMenu();
-                });
-            });
-
-            updateCategoryButtons();
-        }
-
-        // 更新分類按鈕的 active 狀態
-        function updateCategoryButtons() {
-            categoryTabsEl.querySelectorAll('button').forEach(btn => {
-                if (btn.dataset.category === currentCategory) {
-                    btn.classList.add('bg-gray-700', 'text-white');
-                    btn.classList.remove('text-gray-700', 'hover:bg-gray-300');
-                } else {
-                    btn.classList.add('text-gray-700', 'hover:bg-gray-300');
-                    btn.classList.remove('bg-gray-700', 'text-white');
-                }
-            });
-        }
-
-        // 渲染菜單列表
-        function renderMenu() {
-            menuListEl.innerHTML = '';
-            loadingSpinnerMenu.classList.add('hidden');
-
-            const filteredMenu = currentCategory === 'all'
-                ? allMenuData
-                : allMenuData.filter(item => item['大分類'] === currentCategory);
-
-            const tableHeaders = ['排序', '圖片', '大分類', '品項', '價格', '操作'];
-            let html = `<table class="min-w-full divide-y divide-gray-200 rounded-xl overflow-hidden">
-                <thead class="bg-gray-50">
-                    <tr>
-                        ${tableHeaders.map(header => `<th scope="col" class="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${header}</th>`).join('')}
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200" id="menu-table-body">`;
-
-            if (filteredMenu.length === 0) {
-                html += `<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">此分類目前沒有菜單品項</td></tr>`;
-            } else {
-                html += filteredMenu.map((item, index) => `
-                    <tr class="hover:bg-gray-50 transition duration-150 cursor-move table-row" draggable="true" data-id="${item.id}" data-index="${index}">
-                        <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-900">${index + 1}</td>
-                        <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
-                            <img src="${item['圖片']}" alt="${item['品項']}" class="h-12 w-12 sm:h-16 sm:w-16 rounded-lg object-cover shadow-sm" onerror="this.src='https://placehold.co/64x64/E5E7EB/9CA3AF?text=No+Image'; this.alt='無圖片';">
-                        </td>
-                        <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-900">${item['大分類']}</td>
-                        <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm font-medium text-gray-900">${item['品項']}</td>
-                        <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-900">NT$ ${item['價格']}</td>
-                        <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm font-medium">
-                            <button onclick="editItem('${item.id}')" class="text-blue-600 hover:text-blue-900 transition duration-150 transform hover:scale-105 mr-2">編輯</button>
-                            <button onclick="deleteItem('${item.id}')" class="text-red-600 hover:text-red-900 transition duration-150 transform hover:scale-105">刪除</button>
-                        </td>
-                    </tr>
-                `).join('');
-            }
-            
-            html += `</tbody></table>`;
-            menuListEl.innerHTML = html;
-            addDragAndDropListeners();
-            addTouchListeners();
-        }
-
-        // 渲染訂單列表
-        function renderOrders(ordersData) {
-            ordersListEl.innerHTML = '';
-            loadingSpinnerOrders.classList.add('hidden');
-
-            const tableHeaders = ['訂單編號', '總金額', '狀態', '訂單內容', '操作'];
-            let html = `<table class="min-w-full divide-y divide-gray-200 rounded-xl overflow-hidden">
-                <thead class="bg-gray-50">
-                    <tr>
-                        ${tableHeaders.map(header => `<th scope="col" class="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${header}</th>`).join('')}
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">`;
-            
-            if (ordersData.length === 0) {
-                html += `<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">目前沒有訂單</td></tr>`;
-            } else {
-                html += ordersData.map(order => `
-                    <tr class="hover:bg-gray-50 transition duration-150">
-                        <td class="px-3 py-2 sm:px-6 sm:py-4 text-sm text-gray-900 font-mono">${order.id.slice(0, 8)}...</td>
-                        <td class="px-3 py-2 sm:px-6 sm:py-4 text-sm text-gray-900 font-semibold">NT$ ${order.total}</td>
-                        <td class="px-3 py-2 sm:px-6 sm:py-4 text-sm">
-                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${order.status === '已完成' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
-                                ${order.status}
-                            </span>
-                        </td>
-                        <td class="px-3 py-2 sm:px-6 sm:py-4 text-sm text-gray-500">
-                            ${order.items.map(item => `${item.name} x${item.qty}`).join(', ')}
-                        </td>
-                        <td class="px-3 py-2 sm:px-6 sm:py-4 text-sm font-medium">
-                            ${order.status !== '已完成' ? `<button onclick="completeOrder('${order.id}')" class="text-green-600 hover:text-green-900 transition duration-150 transform hover:scale-105 mr-2 text-sm sm:text-base">
-                                <i class="fas fa-check-circle"></i> 完成
-                            </button>` : ''}
-                            <button onclick="deleteOrder('${order.id}')" class="text-red-600 hover:text-red-900 transition duration-150 transform hover:scale-105 text-sm sm:text-base">
-                                <i class="fas fa-trash"></i> 刪除
-                            </button>
-                        </td>
-                    </tr>
-                `).join('');
-            }
-
-            html += `</tbody></table>`;
-            ordersListEl.innerHTML = html;
-        }
-
-        // ==== 觸控拖曳邏輯 ====
-        let touchDraggedItem = null;
-        let touchStartPos = { x: 0, y: 0 };
-        let touchOriginalIndex = -1;
-        let placeholderRow = null;
-        let isTouchDragging = false;
-        let pressTimer = null;
-
-        function addTouchListeners() {
-            const tableBody = document.getElementById('menu-table-body');
-            if (!tableBody) return;
-
-            tableBody.addEventListener('touchstart', (e) => {
-                const targetRow = e.target.closest('tr');
-                if (!targetRow || e.touches.length > 1) return;
-
-                // 檢查是否點擊在編輯/刪除按鈕上，避免衝突
-                const isActionButton = e.target.closest('button');
-                if(isActionButton) {
-                    clearTimeout(pressTimer);
-                    return;
-                }
-
-                isTouchDragging = false;
-                touchStartPos = {
-                    x: e.touches[0].clientX,
-                    y: e.touches[0].clientY
-                };
-
-                // 長按 500ms 後才開始拖曳
-                pressTimer = setTimeout(() => {
-                    isTouchDragging = true;
-                    e.preventDefault(); // 阻止瀏覽器預設行為，如捲動
-                    
-                    touchDraggedItem = targetRow;
-                    touchOriginalIndex = parseInt(targetRow.dataset.index);
-
-                    // 創建一個假的拖曳元素，這樣可以避免直接操作原來的元素導致頁面跳動
-                    const clone = touchDraggedItem.cloneNode(true);
-                    clone.classList.add('touch-dragging');
-                    clone.style.left = `${touchStartPos.x}px`;
-                    clone.style.top = `${touchStartPos.y}px`;
-                    document.body.appendChild(clone);
-
-                    // 創建一個占位符來保持列表空間
-                    placeholderRow = document.createElement('tr');
-                    placeholderRow.classList.add('drag-over');
-                    placeholderRow.style.height = `${touchDraggedItem.offsetHeight}px`;
-                    touchDraggedItem.style.opacity = '0'; // 隱藏原始元素
-
-                    touchDraggedItem.parentNode.insertBefore(placeholderRow, touchDraggedItem);
-                    touchDraggedItem = clone;
-                }, 500);
-            }, { passive: false });
-
-            tableBody.addEventListener('touchmove', (e) => {
-                if (!isTouchDragging || !touchDraggedItem) return;
-                e.preventDefault();
-
-                const touch = e.touches[0];
-                const newX = touch.clientX;
-                const newY = touch.clientY;
-
-                // 更新假元素的顯示位置
-                touchDraggedItem.style.left = `${newX}px`;
-                touchDraggedItem.style.top = `${newY}px`;
-
-                // 尋找新的放置目標
-                const targetElement = document.elementFromPoint(newX, newY);
-                const targetRow = targetElement ? targetElement.closest('tr') : null;
-                
-                if (targetRow && targetRow !== placeholderRow) {
-                    const rect = targetRow.getBoundingClientRect();
-                    const isAfter = newY > rect.top + rect.height / 2;
-
-                    // 視覺回饋：移動占位符
-                    const parent = placeholderRow.parentNode;
-                    // 先移除再插入以更新位置
-                    if(placeholderRow.parentNode) {
-                        placeholderRow.parentNode.removeChild(placeholderRow);
-                    }
-                    if (isAfter) {
-                        parent.insertBefore(placeholderRow, targetRow.nextSibling);
-                    } else {
-                        parent.insertBefore(placeholderRow, targetRow);
-                    }
-                }
-            }, { passive: false });
-
-            tableBody.addEventListener('touchend', (e) => {
-                clearTimeout(pressTimer);
-
-                if (!isTouchDragging) {
-                    return;
-                }
-
-                isTouchDragging = false;
-
-                // 移除假元素
-                if (touchDraggedItem && document.body.contains(touchDraggedItem)) {
-                    document.body.removeChild(touchDraggedItem);
-                }
-
-                // 更新本地數據順序
-                const tableRows = tableBody.querySelectorAll('tr[data-id]');
-                const newOrder = Array.from(tableRows).map(row => row.dataset.id);
-                
-                const oldId = allMenuData[touchOriginalIndex].id;
-                const newIndex = newOrder.findIndex(id => id === oldId);
-
-                // 移除原始行並將其插入新位置
-                const originalRow = document.querySelector(`tr[data-id="${oldId}"]`);
-                if (placeholderRow && originalRow) {
-                    const parent = placeholderRow.parentNode;
-                    parent.replaceChild(originalRow, placeholderRow); // 用原始元素替換占位符
-                    originalRow.style.opacity = '1'; // 恢復透明度
-                } else if (placeholderRow && placeholderRow.parentNode) {
-                    placeholderRow.remove();
-                }
-
-                // 同步 local allMenuData
-                const draggedItemData = allMenuData.splice(touchOriginalIndex, 1)[0];
-                allMenuData.splice(newIndex, 0, draggedItemData);
-
-                // 重新渲染表格以更新排序編號
-                renderMenu(); 
-
-                touchDraggedItem = null;
-                placeholderRow = null;
-            });
-        }
-        
-        // 將新的排序儲存到 Firestore
-        async function saveOrderToFirestore() {
-            if (allMenuData.length === 0) {
-                showMessage('沒有可以儲存的資料。', 'error');
-                return;
-            }
-
-            const batch = writeBatch(db);
-            allMenuData.forEach((item, index) => {
-                const itemRef = doc(db, `artifacts/${appId}/public/data/menu_items`, item.id);
-                batch.update(itemRef, { sortOrder: index });
-            });
-
-            try {
-                await batch.commit();
-                showMessage('菜單順序已成功儲存！', 'success');
-            } catch (error) {
-                console.error('儲存排序時發生錯誤:', error);
-                showMessage('儲存排序時發生錯誤，請稍後再試。', 'error');
-            }
-        }
-        
-        // 處理滑鼠拖曳邏輯
-        function addDragAndDropListeners() {
-            const tableBody = document.getElementById('menu-table-body');
-            if (!tableBody) return;
-
-            let draggedItem = null;
-
-            tableBody.addEventListener('dragstart', (e) => {
-                draggedItem = e.target.closest('tr');
-                if (draggedItem) {
-                    draggedItem.classList.add('dragging');
-                    e.dataTransfer.effectAllowed = 'move';
-                    e.dataTransfer.setData('text/plain', draggedItem.dataset.id);
-                }
-            });
-
-            tableBody.addEventListener('dragend', () => {
-                if (draggedItem) {
-                    draggedItem.classList.remove('dragging');
-                }
-                const rows = tableBody.querySelectorAll('tr');
-                rows.forEach(row => row.classList.remove('drag-over'));
-            });
-
-            tableBody.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                const target = e.target.closest('tr');
-                if (target && target !== draggedItem) {
-                    const rows = tableBody.querySelectorAll('tr');
-                    rows.forEach(row => row.classList.remove('drag-over'));
-                    target.classList.add('drag-over');
-                }
-            });
-
-            tableBody.addEventListener('drop', (e) => {
-                e.preventDefault();
-                const dropTarget = e.target.closest('tr');
-                if (dropTarget && draggedItem && dropTarget !== draggedItem) {
-                    const parent = dropTarget.parentNode;
-                    const rect = dropTarget.getBoundingClientRect();
-                    const isAfter = e.clientY > rect.top + rect.height / 2;
-                    if (isAfter) {
-                        parent.insertBefore(draggedItem, dropTarget.nextSibling);
-                    } else {
-                        parent.insertBefore(draggedItem, dropTarget);
-                    }
-
-                    // 更新本地數據順序
-                    const draggedId = draggedItem.dataset.id;
-                    const newOrder = Array.from(tableBody.children).map(row => row.dataset.id);
-                    
-                    const oldIndex = allMenuData.findIndex(item => item.id === draggedId);
-                    const draggedItemData = allMenuData.splice(oldIndex, 1)[0];
-                    const newIndex = newOrder.findIndex(id => id === draggedId);
-                    allMenuData.splice(newIndex, 0, draggedItemData);
-                }
-                if (draggedItem) {
-                    draggedItem.classList.remove('dragging');
-                }
-                const rows = tableBody.querySelectorAll('tr');
-                rows.forEach(row => row.classList.remove('drag-over'));
-            });
-        }
-        
-        // 打開新增/編輯彈出視窗
-        function openItemModal(item = null) {
-            formEl.reset();
-            itemIdInput.value = '';
-            imageUploadInput.value = '';
-            imagePreviewEl.classList.add('hidden');
-            
-            // 清空並填充分類選項
-            majorCategorySelect.innerHTML = '';
-            const uniqueCategories = [...new Set(allMenuData.map(d => d['大分類']))];
-            uniqueCategories.sort().forEach(category => {
-                const option = document.createElement('option');
-                option.value = category;
-                option.textContent = category;
-                majorCategorySelect.appendChild(option);
-            });
-            majorCategoryInput.value = '';
-
-            if (item) {
-                modalTitleEl.textContent = '編輯菜單品項';
-                itemIdInput.value = item.id;
-                majorCategorySelect.value = item['大分類'];
-                minorCategoryInput.value = item['中分類'];
-                itemNameInput.value = item['品項'];
-                priceInput.value = item['價格'];
-                if (item['圖片']) {
-                    imagePreviewEl.classList.remove('hidden');
-                    imagePreviewImg.src = item['圖片'];
-                }
-            } else {
-                modalTitleEl.textContent = '新增菜單品項';
-                majorCategorySelect.value = currentCategory === 'all' ? (uniqueCategories[0] || '') : currentCategory;
-            }
-            
-            modalEl.classList.remove('hidden');
+        // Functions to handle UI and state changes
+        const showMessage = (text, type) => {
+            messageContainer.innerHTML = `<div class="p-4 rounded-xl font-semibold ${type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">${text}</div>`;
             setTimeout(() => {
-                modalContentEl.classList.remove('scale-95', 'opacity-0');
-                modalContentEl.classList.add('scale-100', 'opacity-100');
-            }, 10);
-        }
-
-        // 關閉新增/編輯彈出視窗
-        function closeItemModal() {
-            modalContentEl.classList.remove('scale-100', 'opacity-100');
-            modalContentEl.classList.add('scale-95', 'opacity-0');
-            setTimeout(() => { modalEl.classList.add('hidden'); }, 300);
-        }
-
-        // 編輯品項
-        window.editItem = async function(id) {
-            const itemToEdit = allMenuData.find(item => item.id === id);
-            if (itemToEdit) { openItemModal(itemToEdit); }
+                messageContainer.innerHTML = '';
+            }, 3000);
         };
 
-        // 刪除品項
-        window.deleteItem = async function(id) {
-            const confirmed = await showConfirm('您確定要刪除這個品項嗎？此操作無法復原。');
-            if (confirmed) {
-                try {
-                    // 取得要刪除的品項資料，以獲得圖片 URL
-                    const itemToDelete = allMenuData.find(item => item.id === id);
-                    if (itemToDelete && itemToDelete['圖片']) {
-                        try {
-                            // 刪除 Firebase Storage 上的圖片
-                            const oldImageRef = ref(storage, itemToDelete['圖片']);
-                            await deleteObject(oldImageRef);
-                        } catch (storageError) {
-                            console.warn("無法刪除儲存空間中的圖片，可能是不存在的 URL 或權限問題:", storageError);
-                        }
-                    }
-                    // 刪除 Firestore 中的文件
-                    await deleteDoc(doc(db, `artifacts/${appId}/public/data/menu_items`, id));
-                    showMessage('品項已成功刪除！');
-                } catch (error) {
-                    console.error("Error removing document: ", error);
-                    showMessage('刪除品項時發生錯誤。', 'error');
-                }
+        const openModal = (item = null) => {
+            if (item) {
+                modalTitle.textContent = '編輯菜單品項';
+                itemIdInput.value = item.id;
+                itemCodeInput.value = item['餐點編號'] || '';
+                itemNameInput.value = item['品項'] || '';
+                priceInput.value = item['價格'] || '';
+                imageUrlInput.value = item['圖片'] || '';
+                majorCategorySelect.value = item['大分類'];
+                majorCategoryInput.value = '';
+            } else {
+                modalTitle.textContent = '新增菜單品項';
+                itemForm.reset();
+                majorCategorySelect.value = activeCategory === 'all' ? majorCategorySelect.options[0]?.value : activeCategory;
+                itemIdInput.value = '';
             }
+            itemModal.classList.remove('hidden');
         };
 
-        // 表單提交事件處理
-        formEl.addEventListener('submit', async function(event) {
-            event.preventDefault();
-
-            saveBtn.disabled = true;
-            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>儲存中...';
-
-            const id = itemIdInput.value;
-            const selectedMajorCategory = majorCategorySelect.value;
-            const newMajorCategory = majorCategoryInput.value.trim();
-            const finalMajorCategory = newMajorCategory || selectedMajorCategory;
-            
-            const minorCategory = minorCategoryInput.value;
-            const itemName = itemNameInput.value;
-            const price = parseFloat(priceInput.value);
-            const imageFile = imageUploadInput.files[0];
-
-            if (isNaN(price)) {
-                showMessage('價格必須是數字！', 'error');
-                saveBtn.disabled = false;
-                saveBtn.innerHTML = '<i class="fas fa-save mr-2"></i>儲存';
-                return;
-            }
-
-            let imageUrl = imagePreviewImg.src.startsWith('https://') ? imagePreviewImg.src : '';
-            
-            // 如果有上傳新圖片檔案
-            if (imageFile) {
-                try {
-                    // 如果是編輯模式，先刪除舊圖片
-                    if (id) {
-                         const oldItem = allMenuData.find(item => item.id === id);
-                         if (oldItem && oldItem['圖片']) {
-                            try {
-                               const oldImageRef = ref(storage, oldItem['圖片']);
-                               await deleteObject(oldImageRef);
-                            } catch (storageError) {
-                                console.warn("無法刪除舊圖片，可能是不存在的 URL 或權限問題:", storageError);
-                            }
-                         }
-                    }
-                    
-                    // 上傳新圖片
-                    const storageRef = ref(storage, `menu_images/${Date.now()}_${imageFile.name}`);
-                    await uploadBytes(storageRef, imageFile);
-                    imageUrl = await getDownloadURL(storageRef);
-                } catch (error) {
-                    console.error("圖片上傳失敗:", error);
-                    showMessage('圖片上傳失敗，請稍後再試。', 'error');
-                    saveBtn.disabled = false;
-                    saveBtn.innerHTML = '<i class="fas fa-save mr-2"></i>儲存';
-                    return;
-                }
-            }
-
-            const itemData = {
-                '大分類': finalMajorCategory,
-                '中分類': minorCategory,
-                '品項': itemName,
-                '價格': price,
-                '圖片': imageUrl
-            };
-
-            try {
-                if (id) {
-                    await updateDoc(doc(db, `artifacts/${appId}/public/data/menu_items`, id), itemData);
-                    showMessage('品項已成功更新！');
-                } else {
-                    const newSortOrder = allMenuData.length;
-                    const newItemData = { ...itemData, sortOrder: newSortOrder };
-                    await addDoc(menuRef, newItemData);
-                    showMessage('品項已成功新增！');
-                }
-            } catch (error) {
-                console.error("Error writing document: ", error);
-                showMessage('儲存品項時發生錯誤。', 'error');
-            }
-            
-            closeItemModal();
-            saveBtn.disabled = false;
-            saveBtn.innerHTML = '<i class="fas fa-save mr-2"></i>儲存';
-        });
-
-        // 新增測試訂單
-        addOrderBtn.addEventListener('click', async () => {
-            if (allMenuData.length === 0) {
-                 showMessage('請先新增菜單品項，才能新增測試訂單。', 'error');
-                 return;
-            }
-            const randomItems = allMenuData.sort(() => 0.5 - Math.random()).slice(0, 3);
-            const items = randomItems.map(item => ({
-                name: item['品項'],
-                qty: Math.floor(Math.random() * 3) + 1
-            }));
-            const total = items.reduce((sum, item) => sum + (item.qty * (allMenuData.find(menuItem => menuItem['品項'] === item.name)?.['價格'] || 0)), 0);
-            const orderData = {
-                items,
-                total,
-                status: '進行中',
-                timestamp: new Date().toISOString()
-            };
-
-            try {
-                await addDoc(ordersRef, orderData);
-                showMessage('已新增測試訂單！', 'success');
-            } catch (error) {
-                console.error('新增訂單失敗:', error);
-                showMessage('新增訂單失敗。', 'error');
-            }
-        });
-
-        // 標記訂單為已完成
-        window.completeOrder = async (id) => {
-            try {
-                await updateDoc(doc(db, `artifacts/${appId}/public/data/orders`, id), {
-                    status: '已完成'
-                });
-                showMessage('訂單已標記為已完成！', 'success');
-            } catch (error) {
-                console.error('更新訂單失敗:', error);
-                showMessage('更新訂單失敗。', 'error');
-            }
+        const closeModal = () => {
+            itemModal.classList.add('hidden');
         };
 
-        // 刪除訂單
-        window.deleteOrder = async (id) => {
-             const confirmed = await showConfirm('您確定要刪除這筆訂單嗎？');
-            if (confirmed) {
-                try {
-                    await deleteDoc(doc(db, `artifacts/${appId}/public/data/orders`, id));
-                    showMessage('訂單已刪除！', 'success');
-                } catch (error) {
-                    console.error('刪除訂單失敗:', error);
-                    showMessage('刪除訂單失敗。', 'error');
-                }
-            }
+        const showConfirmModal = (message, action) => {
+            confirmMessage.textContent = message;
+            confirmAction = action;
+            confirmModal.classList.remove('hidden');
         };
 
+        const hideConfirmModal = () => {
+            confirmModal.classList.add('hidden');
+            confirmAction = null;
+        };
 
-        // 頁籤切換邏輯
-        showMenuBtn.addEventListener('click', () => {
-            menuViewEl.classList.remove('hidden');
-            ordersViewEl.classList.add('hidden');
-            showMenuBtn.classList.add('bg-blue-600', 'text-white');
-            showMenuBtn.classList.remove('text-gray-700', 'hover:bg-gray-300');
-            showOrdersBtn.classList.remove('bg-blue-600', 'text-white');
-            showOrdersBtn.classList.add('text-gray-700', 'hover:bg-gray-300');
-        });
-        showOrdersBtn.addEventListener('click', () => {
-            ordersViewEl.classList.remove('hidden');
-            menuViewEl.classList.add('hidden');
-            showOrdersBtn.classList.add('bg-blue-600', 'text-white');
-            showOrdersBtn.classList.remove('text-gray-700', 'hover:bg-gray-300');
-            showMenuBtn.classList.remove('bg-blue-600', 'text-white');
-            showMenuBtn.classList.add('text-gray-700', 'hover:bg-gray-300');
-        });
-
-        // 圖片預覽功能
-        imageUploadInput.addEventListener('change', (event) => {
-            const file = event.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    imagePreviewImg.src = e.target.result;
-                    imagePreviewEl.classList.remove('hidden');
-                };
-                reader.readAsDataURL(file);
-            }
-        });
-
-        // 按鈕事件監聽
-        document.getElementById('add-item-btn').addEventListener('click', () => openItemModal());
-        document.getElementById('save-order-btn').addEventListener('click', saveOrderToFirestore);
-        document.getElementById('close-modal-btn').addEventListener('click', closeItemModal);
-
-        // 初始化 Firebase 和 Firestore
-        window.onload = async function() {
+        // Firebase Initialization and Authentication
+        const initFirebase = async () => {
             try {
-                const firebaseConfig = {
-                    apiKey: "AIzaSyC4YeUVgqiQlZssaXnYee_mtD2MXfbcwtE",
-                    authDomain: "project-7242265943022381509.firebaseapp.com",
-                    projectId: "project-7242265943022381509",
-                    storageBucket: "project-7242265943022381509.appspot.com",
-                    messagingSenderId: "95453496573",
-                    appId: "1:95453496573:web:696833aa8e3062dbcd2a94",
-                    measurementId: "G-XCTVQZ724Z"
-                };
-
-                const app = initializeApp(firebaseConfig);
+                app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
-                storage = getStorage(app);
+                auth = getAuth(app);
 
-                menuRef = collection(db, `artifacts/${appId}/public/data/menu_items`);
-                ordersRef = collection(db, `artifacts/${appId}/public/data/orders`);
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
 
-                // 檢查是否已上傳初始菜單資料
-                const snapshot = await getDocs(query(menuRef));
-                if (snapshot.empty) {
-                    console.log("沒有找到現有資料，正在從 CSV 上傳初始資料...");
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        // Start listeners after authentication
+                        setupListeners();
+                    } else {
+                        userId = null;
+                        showMessage('無法驗證使用者，請重試。', 'error');
+                    }
+                });
+            } catch (error) {
+                console.error("Firebase initialization or authentication failed:", error);
+                showMessage('Firebase 初始化或認證失敗。', 'error');
+            }
+        };
+
+        // Data listeners from Firestore
+        const setupListeners = () => {
+            // Listen for menu items
+            const menuRef = collection(db, `artifacts/${appId}/public/data/menu_items`);
+            onSnapshot(menuRef, async (querySnapshot) => {
+                const items = [];
+                querySnapshot.forEach((doc) => {
+                    items.push({ id: doc.id, ...doc.data() });
+                });
+                items.sort((a, b) => {
+                    const sortA = a.sortOrder !== undefined ? a.sortOrder : Infinity;
+                    const sortB = b.sortOrder !== undefined ? b.sortOrder : Infinity;
+                    return sortA - sortB;
+                });
+                menuItems = items;
+                // If initial data is not present, upload it.
+                if (menuItems.length === 0) {
                     await uploadInitialData();
                 }
+                renderContent();
+            }, (error) => {
+                console.error("Could not load menu data from Firestore:", error);
+                showMessage('無法從資料庫載入菜單。', 'error');
+            });
 
-                // 監聽菜單資料
-                loadingSpinnerMenu.classList.remove('hidden');
-                onSnapshot(query(menuRef), (querySnapshot) => {
-                    let items = [];
-                    querySnapshot.forEach((doc) => {
-                        items.push({ id: doc.id, ...doc.data() });
-                    });
-                    items.sort((a, b) => {
-                        const sortA = a.sortOrder !== undefined ? a.sortOrder : Infinity;
-                        const sortB = b.sortOrder !== undefined ? b.sortOrder : Infinity;
-                        return sortA - sortB;
-                    });
-                    allMenuData = items;
-                    const uniqueCategories = [...new Set(allMenuData.map(d => d['大分類']))].sort();
-                    renderCategories(uniqueCategories);
-                    renderMenu();
-                }, (error) => {
-                    console.error("無法從 Firestore 載入菜單資料:", error);
-                    showMessage('無法從資料庫載入菜單。', 'error');
+            // Listen for orders
+            const ordersRef = collection(db, `artifacts/${appId}/public/data/orders`);
+            onSnapshot(ordersRef, (querySnapshot) => {
+                orders = [];
+                querySnapshot.forEach((doc) => {
+                    orders.push({ id: doc.id, ...doc.data() });
                 });
-                
-                // 監聽訂單資料
-                loadingSpinnerOrders.classList.remove('hidden');
-                onSnapshot(query(ordersRef), (querySnapshot) => {
-                    const orders = [];
-                    querySnapshot.forEach((doc) => {
-                        orders.push({ id: doc.id, ...doc.data() });
-                    });
-                    orders.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)); // 依時間排序
-                    renderOrders(orders);
-                }, (error) => {
-                    console.error("無法從 Firestore 載入訂單資料:", error);
-                    showMessage('無法從資料庫載入訂單。', 'error');
-                });
-
-            } catch (error) {
-                console.error("Firebase 初始化錯誤:", error);
-            }
+                orders.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                if (activeTab === 'orders') {
+                    renderContent();
+                }
+            }, (error) => {
+                console.error('Failed to load orders data:', error);
+                showMessage('無法從資料庫載入訂單。', 'error');
+            });
         };
 
-        // 解析 CSV 數據並上傳到 Firestore
-        async function uploadInitialData() {
-            const csvData = `大分類,中分類,品項,價格,圖片
-熱門,A,漢堡肉芝士蛋堡+紅茶,70,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-熱門,B,火腿芝士蛋吐司+紅茶,60,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-熱門,C,鮪魚芝士蛋堡+紅茶,70,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-熱門,1,檸檬雞蛋吐司+紅茶,65,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-熱門,2,火腿蛋潛艇堡+紅茶,70,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-熱門,3,香酥雞柳蛋堡+紅茶,80,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-熱門,4,勁辣雞腿蛋堡+紅茶,85,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-三明治,三明治,肉鬆三明治,40,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-三明治,三明治,薯餅三明治,50,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-漢堡,漢堡,總匯漢堡,70,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-漢堡,漢堡,雞排漢堡,80,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-蛋餅,蛋餅,九層塔蛋餅,45,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-蛋餅,蛋餅,玉米蛋餅,40,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-套餐,套餐,漢堡肉芝士蛋堡+紅茶,70,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-套餐,套餐,火腿芝士蛋吐司+紅茶,60,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-飲料,飲料,古早味紅茶,25,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg
-飲料,飲料,鮮奶茶,40,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg`;
+        const uploadInitialData = async () => {
+            const checkRef = collection(db, `artifacts/${appId}/public/data/menu_items`);
+            const checkSnapshot = await getDocs(checkRef);
+            if (!checkSnapshot.empty) {
+                return; // Data already exists
+            }
+            const csvData = `大分類,品項,價格,圖片,餐點編號
+熱門,漢堡肉芝士蛋堡,70,https://placehold.co/400x300/E5E7EB/9CA3AF?text=漢堡肉芝士蛋堡,A
+熱門,火腿芝士蛋吐司,60,https://placehold.co/400x300/E5E7EB/9CA3AF?text=火腿芝士蛋吐司,B
+熱門,鮪魚芝士蛋堡,70,https://placehold.co/400x300/E5E7EB/9CA3AF?text=鮪魚芝士蛋堡,C
+熱門,檸檬雞蛋吐司,65,https://placehold.co/400x300/E5E7EB/9CA3AF?text=檸檬雞蛋吐司,1
+熱門,火腿蛋潛艇堡,70,https://placehold.co/400x300/E5E7EB/9CA3AF?text=火腿蛋潛艇堡,2
+熱門,香酥雞柳蛋堡,80,https://placehold.co/400x300/E5E7EB/9CA3AF?text=香酥雞柳蛋堡,3
+熱門,勁辣雞腿蛋堡,85,https://placehold.co/400x300/E5E7EB/9CA3AF?text=勁辣雞腿蛋堡,4
+三明治,肉鬆三明治,40,https://placehold.co/400x300/E5E7EB/9CA3AF?text=肉鬆三明治,1
+三明治,薯餅三明治,50,https://placehold.co/400x300/E5E7EB/9CA3AF?text=薯餅三明治,2
+漢堡,總匯漢堡,70,https://placehold.co/400x300/E5E7EB/9CA3AF?text=總匯漢堡,1
+漢堡,雞排漢堡,80,https://placehold.co/400x300/E5E7EB/9CA3AF?text=雞排漢堡,2
+蛋餅,九層塔蛋餅,45,https://placehold.co/400x300/E5E7EB/9CA3AF?text=九層塔蛋餅,1
+蛋餅,玉米蛋餅,40,https://placehold.co/400x300/E5E7EB/9CA3AF?text=玉米蛋餅,2
+套餐,漢堡肉芝士蛋堡+紅茶,70,https://placehold.co/400x300/E5E7EB/9CA3AF?text=漢堡肉芝士蛋堡+紅茶,1
+套餐,火腿芝士蛋吐司+紅茶,60,https://placehold.co/400x300/E5E7EB/9CA3AF?text=火腿芝士蛋吐司+紅茶,2
+飲料,古早味紅茶,25,https://placehold.co/400x300/E5E7EB/9CA3AF?text=古早味紅茶,1
+飲料,鮮奶茶,40,https://placehold.co/400x300/E5E7EB/9CA3AF?text=鮮奶茶,2`;
             
             const lines = csvData.split('\n');
             const headers = lines[0].split(',').map(h => h.trim());
             const itemsToUpload = [];
-
             for (let i = 1; i < lines.length; i++) {
                 const values = lines[i].split(',').map(v => v.trim());
                 if (values.length === headers.length) {
@@ -982,23 +289,434 @@
                     headers.forEach((header, index) => {
                         item[header] = (header === '價格') ? parseFloat(values[index]) : values[index];
                     });
-                    item.sortOrder = i - 1; 
+                    item.sortOrder = i - 1;
                     itemsToUpload.push(item);
                 }
             }
             const batch = writeBatch(db);
             itemsToUpload.forEach(item => {
-                const docRef = doc(menuRef);
-                batch.set(docRef, item);
+              const docRef = doc(collection(db, `artifacts/${appId}/public/data/menu_items`));
+              batch.set(docRef, item);
             });
+            try {
+              await batch.commit();
+              console.log("Initial data uploaded successfully.");
+            } catch (error) {
+              console.error("Error uploading initial data:", error);
+            }
+        };
+
+        // Render UI based on active tab
+        const renderContent = () => {
+            if (activeTab === 'orders') {
+                renderOrdersTab();
+            } else {
+                renderMenuTab();
+            }
+            updateCategorySelect();
+        };
+
+        const renderOrdersTab = () => {
+            let tableRows = '';
+            if (orders.length === 0) {
+                tableRows = `<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">目前沒有訂單</td></tr>`;
+            } else {
+                orders.forEach(order => {
+                    const statusClass = order.status === '已完成' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
+                    const itemsList = order.items.map(item => `${item.name} x${item.qty}`).join(', ');
+                    tableRows += `
+                        <tr class="hover:bg-gray-50 transition duration-150">
+                            <td class="px-3 py-2 sm:px-6 sm:py-4 text-sm text-gray-900 font-mono">${order.tableNumber}</td>
+                            <td class="px-3 py-2 sm:px-6 sm:py-4 text-sm text-gray-900 font-mono">${new Date(order.timestamp).toLocaleString()}</td>
+                            <td class="px-3 py-2 sm:px-6 sm:py-4 text-sm text-gray-900 font-semibold">NT$ ${order.total}</td>
+                            <td class="px-3 py-2 sm:px-6 sm:py-4 text-sm">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">
+                                    ${order.status}
+                                </span>
+                            </td>
+                            <td class="px-3 py-2 sm:px-6 sm:py-4 text-sm text-gray-500">${itemsList}</td>
+                            <td class="px-3 py-2 sm:px-6 sm:py-4 text-sm font-medium space-x-2">
+                                <button onclick="completeOrder('${order.id}')" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-1 px-3 rounded-lg transition duration-300 transform hover:scale-105">
+                                    完成
+                                </button>
+                                <button onclick="deleteOrder('${order.id}')" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-lg transition duration-300 transform hover:scale-105">
+                                    刪除
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+
+            contentArea.innerHTML = `
+                <div class="active-view">
+                    <div class="flex flex-wrap justify-end gap-2 sm:gap-4 mb-4 sm:mb-6">
+                        <button id="add-order-btn" class="flex-grow sm:flex-grow-0 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 sm:px-6 rounded-xl transition duration-300 transform hover:scale-105 shadow-md text-sm sm:text-base">
+                            <i class="fas fa-shopping-cart mr-2"></i>新增測試訂單
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 rounded-xl overflow-hidden">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    ${['桌號', '訂單時間', '總金額', '狀態', '訂單內容', '操作'].map(header => `<th scope="col" class="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${header}</th>`).join('')}
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                ${tableRows}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            document.getElementById('add-order-btn').addEventListener('click', handleAddOrder);
+        };
+
+        const renderMenuTab = () => {
+            const categories = ['all', ...new Set(menuItems.map(item => item['大分類']))].sort();
+            const categoryButtons = categories.map(cat => `
+                <button
+                    onclick="setActiveCategory('${cat}')"
+                    class="py-2 px-4 rounded-full font-semibold transition-colors duration-300 text-sm sm:text-base ${activeCategory === cat ? 'bg-gray-700 text-white' : 'text-gray-700 hover:bg-gray-300'}"
+                >
+                    ${cat === 'all' ? '所有品項' : cat}
+                </button>
+            `).join('');
+
+            const filteredItems = activeCategory === 'all'
+                ? menuItems
+                : menuItems.filter(item => item['大分類'] === activeCategory);
+
+            let tableRows = '';
+            if (filteredItems.length === 0) {
+                tableRows = `<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">此分類目前沒有菜單品項</td></tr>`;
+            } else {
+                filteredItems.forEach((item, index) => {
+                    const imageUrl = item['圖片'] || 'https://placehold.co/64x64/E5E7EB/9CA3AF?text=No+Image';
+                    tableRows += `
+                        <tr
+                            id="item-${item.id}"
+                            class="hover:bg-gray-50 transition duration-150 cursor-move table-row"
+                            draggable="true"
+                            data-item-id="${item.id}"
+                        >
+                            <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-900">${index + 1}</td>
+                            <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+                                <img src="${imageUrl}" alt="${item['品項']}" class="h-12 w-12 sm:h-16 sm:w-16 rounded-lg object-cover shadow-sm" />
+                            </td>
+                            <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-900">${item['大分類']}</td>
+                            <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-900">${item['餐點編號'] || '-'}</td>
+                            <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm font-medium text-gray-900">${item['品項']}</td>
+                            <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-900">NT$ ${item['價格']}</td>
+                            <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm font-medium">
+                                <button onclick="openModalWithItem('${item.id}')" class="text-blue-600 hover:text-blue-900 transition duration-150 transform hover:scale-105 mr-2">編輯</button>
+                                <button onclick="deleteItem('${item.id}')" class="text-red-600 hover:text-red-900 transition duration-150 transform hover:scale-105">刪除</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+
+            contentArea.innerHTML = `
+                <div class="active-view">
+                    <div class="flex flex-wrap gap-2 mb-4 sm:mb-6">
+                        ${categoryButtons}
+                    </div>
+                    <div class="flex flex-wrap justify-end gap-2 sm:gap-4 mb-4 sm:mb-6">
+                        <button id="save-order-btn" class="flex-grow sm:flex-grow-0 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 sm:px-6 rounded-xl transition duration-300 transform hover:scale-105 shadow-md text-sm sm:text-base">
+                            <i class="fas fa-save mr-2"></i>儲存排序
+                        </button>
+                        <button id="add-item-btn" class="flex-grow sm:flex-grow-0 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 sm:px-6 rounded-xl transition duration-300 transform hover:scale-105 shadow-md text-sm sm:text-base">
+                            <i class="fas fa-plus-circle mr-2"></i>新增品項
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 rounded-xl overflow-hidden">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    ${['排序', '圖片', '大分類', '餐點編號', '品項', '價格', '操作'].map(header => `<th scope="col" class="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${header}</th>`).join('')}
+                                </tr>
+                            </thead>
+                            <tbody id="menu-table-body" class="bg-white divide-y divide-gray-200">
+                                ${tableRows}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            // Add event listeners for new elements
+            document.getElementById('add-item-btn').addEventListener('click', () => openModal());
+            document.getElementById('save-order-btn').addEventListener('click', handleSaveOrder);
+            setupDragAndDrop();
+        };
+        
+        // Update category select options
+        const updateCategorySelect = () => {
+            if (!majorCategorySelect) return;
+            const categories = [...new Set(menuItems.map(item => item['大分類']))].sort();
+            majorCategorySelect.innerHTML = categories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+        };
+
+        // Event Listeners
+        window.addEventListener('load', initFirebase);
+        ordersTabBtn.addEventListener('click', () => {
+            activeTab = 'orders';
+            ordersTabBtn.classList.add('bg-blue-600', 'text-white');
+            ordersTabBtn.classList.remove('text-gray-700', 'hover:bg-gray-300');
+            menuTabBtn.classList.remove('bg-blue-600', 'text-white');
+            menuTabBtn.classList.add('text-gray-700', 'hover:bg-gray-300');
+            renderContent();
+        });
+        menuTabBtn.addEventListener('click', () => {
+            activeTab = 'menu';
+            menuTabBtn.classList.add('bg-blue-600', 'text-white');
+            menuTabBtn.classList.remove('text-gray-700', 'hover:bg-gray-300');
+            ordersTabBtn.classList.remove('bg-blue-600', 'text-white');
+            ordersTabBtn.classList.add('text-gray-700', 'hover:bg-gray-300');
+            renderContent();
+        });
+        closeModalBtn.addEventListener('click', closeModal);
+        cancelConfirmBtn.addEventListener('click', hideConfirmModal);
+        confirmActionBtn.addEventListener('click', () => {
+            if (confirmAction) {
+                confirmAction();
+                hideConfirmModal();
+            }
+        });
+        itemForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const id = itemIdInput.value;
+            const selectedMajorCategory = majorCategorySelect.value;
+            const newMajorCategory = majorCategoryInput.value.trim();
+            const finalMajorCategory = newMajorCategory || selectedMajorCategory;
+            const price = parseFloat(priceInput.value);
+
+            if (isNaN(price)) {
+                showMessage('價格必須是數字！', 'error');
+                return;
+            }
+
+            const itemData = {
+                '大分類': finalMajorCategory,
+                '餐點編號': itemCodeInput.value,
+                '品項': itemNameInput.value,
+                '價格': price,
+                '圖片': imageUrlInput.value || ''
+            };
 
             try {
-                await batch.commit();
-                console.log("初始資料已批量上傳。");
+                if (id) {
+                    await updateDoc(doc(db, `artifacts/${appId}/public/data/menu_items`, id), itemData);
+                    showMessage('品項已成功更新！', 'success');
+                } else {
+                    const newSortOrder = menuItems.length;
+                    const newItemData = { ...itemData, sortOrder: newSortOrder };
+                    await addDoc(collection(db, `artifacts/${appId}/public/data/menu_items`), newItemData);
+                    showMessage('品項已成功新增！', 'success');
+                }
             } catch (error) {
-                console.error("上傳初始資料時發生錯誤:", error);
+                console.error("Error saving item:", error);
+                showMessage('儲存品項時發生錯誤。', 'error');
             }
-        }
+            closeModal();
+        });
+
+        // Global functions for event listeners attached via HTML
+        window.openModalWithItem = (itemId) => {
+            const item = menuItems.find(i => i.id === itemId);
+            if (item) {
+                openModal(item);
+            }
+        };
+
+        window.setActiveCategory = (category) => {
+            activeCategory = category;
+            renderMenuTab();
+        };
+
+        window.completeOrder = async (orderId) => {
+            if (!db) return;
+            try {
+                await updateDoc(doc(db, `artifacts/${appId}/public/data/orders`, orderId), {
+                    status: '已完成'
+                });
+                showMessage('訂單已標記為已完成！', 'success');
+            } catch (error) {
+                console.error('Failed to update order:', error);
+                showMessage('更新訂單失敗。', 'error');
+            }
+        };
+
+        window.deleteOrder = (orderId) => {
+            showConfirmModal('您確定要刪除這筆訂單嗎？', async () => {
+                if (!db) return;
+                try {
+                    await deleteDoc(doc(db, `artifacts/${appId}/public/data/orders`, orderId));
+                    showMessage('訂單已刪除！', 'success');
+                } catch (error) {
+                    console.error('Failed to delete order:', error);
+                    showMessage('刪除訂單失敗。', 'error');
+                }
+            });
+        };
+
+        window.deleteItem = (itemId) => {
+            showConfirmModal('您確定要刪除這個品項嗎？此操作無法復原。', async () => {
+                if (!db) return;
+                try {
+                    await deleteDoc(doc(db, `artifacts/${appId}/public/data/menu_items`, itemId));
+                    showMessage('品項已成功刪除！', 'success');
+                } catch (error) {
+                    console.error("Error deleting document:", error);
+                    showMessage('刪除品項時發生錯誤。', 'error');
+                }
+            });
+        };
+
+        const handleAddOrder = async () => {
+            if (!db || menuItems.length === 0) {
+                showMessage('請先新增菜單品項，才能新增測試訂單。', 'error');
+                return;
+            }
+            const randomItems = menuItems.sort(() => 0.5 - Math.random()).slice(0, 3);
+            const items = randomItems.map(item => ({
+                name: item['品項'],
+                qty: Math.floor(Math.random() * 3) + 1
+            }));
+            const total = items.reduce((sum, item) => sum + (item.qty * (menuItems.find(menuItem => menuItem['品項'] === item.name)?.['價格'] || 0)), 0);
+            const tableNumber = Math.floor(Math.random() * 20) + 1;
+            const orderData = {
+                items,
+                total,
+                status: '進行中',
+                timestamp: new Date().toISOString(),
+                tableNumber
+            };
+            try {
+                await addDoc(collection(db, `artifacts/${appId}/public/data/orders`), orderData);
+                showMessage('已新增測試訂單！', 'success');
+            } catch (error) {
+                console.error('Failed to add order:', error);
+                showMessage('新增訂單失敗。', 'error');
+            }
+        };
+
+        const handleSaveOrder = async () => {
+            if (!db || menuItems.length === 0) {
+                showMessage('沒有可以儲存的資料。', 'error');
+                return;
+            }
+            const batch = writeBatch(db);
+            menuItems.forEach((item, index) => {
+                const itemRef = doc(db, `artifacts/${appId}/public/data/menu_items`, item.id);
+                batch.update(itemRef, { sortOrder: index });
+            });
+            try {
+                await batch.commit();
+                showMessage('菜單順序已成功儲存！', 'success');
+            } catch (error) {
+                console.error('Error saving order:', error);
+                showMessage('儲存排序時發生錯誤，請稍後再試。', 'error');
+            }
+        };
+
+        const setupDragAndDrop = () => {
+            const tbody = document.getElementById('menu-table-body');
+            tbody.addEventListener('dragstart', (e) => {
+                const target = e.target.closest('tr');
+                draggedItem = target;
+                e.dataTransfer.setData('text/plain', target.dataset.itemId);
+                target.classList.add('dragging');
+            });
+
+            tbody.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                const target = e.target.closest('tr');
+                if (target && target !== draggedItem) {
+                    const rect = target.getBoundingClientRect();
+                    const next = (e.clientY - rect.top) / rect.height > 0.5;
+                    tbody.insertBefore(draggedItem, next && target.nextSibling || target);
+                }
+            });
+
+            tbody.addEventListener('dragend', () => {
+                if (draggedItem) {
+                    draggedItem.classList.remove('dragging');
+                    draggedItem = null;
+                }
+                updateMenuItemsOrder();
+            });
+
+            // Add touch event listeners for mobile drag/drop simulation
+            let touchItem = null;
+            let initialY = 0;
+            let initialTouchMove = 0;
+
+            tbody.addEventListener('touchstart', (e) => {
+                const target = e.target.closest('tr');
+                if (target) {
+                    e.preventDefault(); // Prevent scrolling
+                    touchItem = target;
+                    initialY = e.touches[0].clientY;
+                    touchItem.classList.add('dragging');
+                }
+            }, { passive: false });
+
+            tbody.addEventListener('touchmove', (e) => {
+                if (!touchItem) return;
+                e.preventDefault();
+                const currentY = e.touches[0].clientY;
+                const deltaY = currentY - initialY;
+                const currentTouchMove = e.touches[0].clientY;
+                
+                touchItem.style.transform = `translateY(${deltaY}px)`;
+
+                const allRows = Array.from(tbody.querySelectorAll('tr'));
+                allRows.forEach(row => {
+                    const rect = row.getBoundingClientRect();
+                    if (currentTouchMove > rect.top && currentTouchMove < rect.bottom && row !== touchItem) {
+                        const targetIndex = allRows.indexOf(row);
+                        const currentIndex = allRows.indexOf(touchItem);
+                        if (targetIndex !== currentIndex) {
+                            if (currentIndex < targetIndex) {
+                                tbody.insertBefore(touchItem, row.nextSibling);
+                            } else {
+                                tbody.insertBefore(touchItem, row);
+                            }
+                        }
+                    }
+                });
+            }, { passive: false });
+
+            tbody.addEventListener('touchend', () => {
+                if (touchItem) {
+                    touchItem.classList.remove('dragging');
+                    touchItem.style.transform = '';
+                    touchItem = null;
+                    updateMenuItemsOrder();
+                }
+            });
+        };
+
+        const updateMenuItemsOrder = () => {
+            const newOrder = [];
+            const rows = document.getElementById('menu-table-body').querySelectorAll('tr');
+            rows.forEach((row, index) => {
+                const itemId = row.dataset.itemId;
+                const item = menuItems.find(i => i.id === itemId);
+                if (item) {
+                    newOrder.push({ ...item, sortOrder: index });
+                }
+            });
+            menuItems = newOrder;
+            // Re-render to update the visible sort order numbers
+            renderMenuTab();
+        };
+
+        window.onload = () => {
+            initFirebase();
+            renderContent();
+        };
     </script>
 </body>
 </html>
