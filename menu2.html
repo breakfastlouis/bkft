@@ -1,706 +1,722 @@
-import React, { useState, useEffect } from 'react';
-
-// Firebase imports for Firestore and Auth
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
-import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc, query, getDocs, writeBatch } from 'firebase/firestore';
-
-// Define Firebase configuration and App ID from environment variables
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-// Cloudinary configuration (replace with your values)
-const CLOUDINARY_CLOUD_NAME = 'dfkanhnem';
-const CLOUDINARY_UPLOAD_PRESET = 'menu-images-preset'; // 請務必在 Cloudinary 後台創建此預設！
-const CLOUDINARY_API_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
-
-const App = () => {
-  // Global state management
-  const [db, setDb] = useState(null);
-  const [auth, setAuth] = useState(null);
-  const [userId, setUserId] = useState(null);
-  const [menuItems, setMenuItems] = useState([]);
-  const [orders, setOrders] = useState([]);
-  const [activeTab, setActiveTab] = useState('orders');
-  const [activeCategory, setActiveCategory] = useState('all');
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isConfirmModalOpen, setIsConfirmModal] = useState(false);
-  const [currentConfirmAction, setCurrentConfirmAction] = useState(null);
-  const [message, setMessage] = useState({ text: '', type: '' });
-  const [loading, setLoading] = useState({ menu: true, orders: true, auth: true });
-  const [currentMenuItem, setCurrentMenuItem] = useState(null);
-  const [isUploading, setIsUploading] = useState(false);
-
-  // Initialize Firebase and authenticate
-  useEffect(() => {
-    const initFirebase = async () => {
-      try {
-        const app = initializeApp(firebaseConfig);
-        const firestore = getFirestore(app);
-        const authService = getAuth(app);
-        setDb(firestore);
-        setAuth(authService);
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>早餐店後台管理系統</title>
+    <!-- 引入 Tailwind CSS 確保響應式設計和美觀 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Font Awesome 顯示圖標 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- 引入 Google Fonts 的 Noto Sans TC 確保中文字體顯示正常 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .table-row.dragging {
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body class="p-2 sm:p-4 min-h-screen">
+    <div class="bg-white p-4 sm:p-6 md:p-10 rounded-2xl md:rounded-3xl shadow-2xl w-full max-w-7xl mx-auto overflow-hidden">
         
-        if (initialAuthToken) {
-          await signInWithCustomToken(authService, initialAuthToken);
-        } else {
-          await signInAnonymously(authService);
-        }
-        
-        authService.onAuthStateChanged(user => {
-          if (user) {
-            setUserId(user.uid);
-          } else {
-            setUserId(null);
-          }
-          setLoading(prev => ({ ...prev, auth: false }));
-        });
-      } catch (error) {
-        console.error("Firebase initialization or authentication failed:", error);
-        showMessage('Firebase 初始化或認證失敗。', 'error');
-        setLoading(prev => ({ ...prev, auth: false }));
-      }
-    };
-    initFirebase();
-  }, []);
-
-  // Listen to menu data from Firebase
-  useEffect(() => {
-    if (!db || !userId) return;
-    const menuRef = collection(db, `artifacts/${appId}/public/data/menu_items`);
-    const q = query(menuRef);
-
-    const unsubscribe = onSnapshot(q, async (querySnapshot) => {
-      setLoading(prev => ({ ...prev, menu: true }));
-      let items = [];
-      querySnapshot.forEach((doc) => {
-        items.push({ id: doc.id, ...doc.data() });
-      });
-      items.sort((a, b) => {
-        const sortA = a.sortOrder !== undefined ? a.sortOrder : Infinity;
-        const sortB = b.sortOrder !== undefined ? b.sortOrder : Infinity;
-        return sortA - sortB;
-      });
-      setMenuItems(items);
-      setLoading(prev => ({ ...prev, menu: false }));
-
-      // If it's the first load and menu is empty, upload initial data
-      if (items.length === 0) {
-        await uploadInitialData(db);
-      }
-    }, (error) => {
-      console.error("Could not load menu data from Firestore:", error);
-      showMessage('無法從資料庫載入菜單。', 'error');
-      setLoading(prev => ({ ...prev, menu: false }));
-    });
-
-    return () => unsubscribe();
-  }, [db, userId]);
-
-  // Listen to orders data from Firebase
-  useEffect(() => {
-    if (!db || !userId) return;
-    const ordersRef = collection(db, `artifacts/${appId}/public/data/orders`);
-    const q = query(ordersRef);
-
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      setLoading(prev => ({ ...prev, orders: true }));
-      const fetchedOrders = [];
-      querySnapshot.forEach((doc) => {
-        fetchedOrders.push({ id: doc.id, ...doc.data() });
-      });
-      fetchedOrders.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-      setOrders(fetchedOrders);
-      setLoading(prev => ({ ...prev, orders: false }));
-    }, (error) => {
-      console.error("Could not load orders data from Firestore:", error);
-      showMessage('無法從資料庫載入訂單。', 'error');
-      setLoading(prev => ({ ...prev, orders: false }));
-    });
-
-    return () => unsubscribe();
-  }, [db, userId]);
-
-  // Display status message
-  const showMessage = (text, type) => {
-    setMessage({ text, type });
-    setTimeout(() => setMessage({ text: '', type: '' }), 3000);
-  };
-
-  // Modal-related functions
-  const openModal = (item = null) => {
-    setCurrentMenuItem(item);
-    setIsModalOpen(true);
-  };
-
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setCurrentMenuItem(null);
-  };
-
-  const handleConfirm = (action) => {
-    setCurrentConfirmAction(action);
-    setIsConfirmModal(true);
-  };
-
-  const handleConfirmAction = async (isConfirmed) => {
-    if (isConfirmed && currentConfirmAction) {
-      await currentConfirmAction.action();
-    }
-    setIsConfirmModal(false);
-    setCurrentConfirmAction(null);
-  };
-  
-  // Handle form submission for adding/editing items
-  const handleFormSubmit = async (event) => {
-    event.preventDefault();
-    if (!db) return;
-    setIsUploading(true);
-
-    const form = event.target;
-    const formData = new FormData(form);
-    const id = formData.get('itemId');
-    const selectedMajorCategory = formData.get('major-category-select');
-    const newMajorCategory = formData.get('major-category-input').trim();
-    const finalMajorCategory = newMajorCategory || selectedMajorCategory;
-    const imageFile = formData.get('image-upload');
-    const price = parseFloat(formData.get('price'));
-    const itemName = formData.get('item-name');
-
-    if (isNaN(price)) {
-      showMessage('價格必須是數字！', 'error');
-      setIsUploading(false);
-      return;
-    }
-
-    let imageUrl = currentMenuItem?.['圖片'] || '';
-
-    // If a new image file is uploaded, upload to Cloudinary
-    if (imageFile && imageFile.size > 0) {
-      const cloudinaryFormData = new FormData();
-      cloudinaryFormData.append('file', imageFile);
-      cloudinaryFormData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-
-      try {
-        const response = await fetch(CLOUDINARY_API_URL, {
-          method: 'POST',
-          body: cloudinaryFormData,
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(`Cloudinary 上傳失敗: ${errorData.error.message}`);
-        }
-
-        const data = await response.json();
-        imageUrl = data.secure_url;
-        showMessage('圖片已成功上傳！', 'success');
-      } catch (error) {
-        console.error("Image upload failed:", error);
-        showMessage(`圖片上傳失敗，請檢查 Cloudinary 設定。錯誤: ${error.message}`, 'error');
-        setIsUploading(false);
-        return;
-      }
-    }
-    
-    // Update or add Firestore data
-    const itemData = {
-      '大分類': finalMajorCategory,
-      '餐點編號': formData.get('item-code'),
-      '品項': itemName,
-      '價格': price,
-      '圖片': imageUrl
-    };
-
-    try {
-      if (id) {
-        await updateDoc(doc(db, `artifacts/${appId}/public/data/menu_items`, id), itemData);
-        showMessage('品項已成功更新！', 'success');
-      } else {
-        const newSortOrder = menuItems.length;
-        const newItemData = { ...itemData, sortOrder: newSortOrder };
-        await addDoc(collection(db, `artifacts/${appId}/public/data/menu_items`), newItemData);
-        showMessage('品項已成功新增！', 'success');
-      }
-    } catch (error) {
-      console.error("Error saving item:", error);
-      showMessage('儲存品項時發生錯誤。', 'error');
-    }
-    
-    setIsUploading(false);
-    closeModal();
-  };
-
-  // Handle drag-and-drop for menu item sorting
-  const handleDragStart = (e, draggedItem) => {
-    e.dataTransfer.setData('text/plain', draggedItem.id);
-    e.currentTarget.classList.add('dragging');
-  };
-
-  const handleDragOver = (e, targetItem) => {
-    e.preventDefault();
-    const draggedItemId = e.dataTransfer.getData('text/plain');
-    if (draggedItemId !== targetItem.id) {
-      const draggedIndex = menuItems.findIndex(item => item.id === draggedItemId);
-      const targetIndex = menuItems.findIndex(item => item.id === targetItem.id);
-      
-      const newOrder = [...menuItems];
-      const [removed] = newOrder.splice(draggedIndex, 1);
-      newOrder.splice(targetIndex, 0, removed);
-      
-      setMenuItems(newOrder);
-    }
-  };
-
-  const handleDragEnd = (e) => {
-    e.currentTarget.classList.remove('dragging');
-  };
-  
-  // Touch drag logic (simplified, for placeholder)
-  const handleTouchStart = (e, item) => {
-    // A more complex logic for long-press, drag, and drop is needed here
-    console.log("Touch started on item:", item.id);
-  };
-  
-  // Save sorting order to Firestore
-  const handleSaveOrder = async () => {
-    if (!db || menuItems.length === 0) {
-      showMessage('沒有可以儲存的資料。', 'error');
-      return;
-    }
-
-    const batch = writeBatch(db);
-    menuItems.forEach((item, index) => {
-      const itemRef = doc(db, `artifacts/${appId}/public/data/menu_items`, item.id);
-      batch.update(itemRef, { sortOrder: index });
-    });
-
-    try {
-      await batch.commit();
-      showMessage('菜單順序已成功儲存！', 'success');
-    } catch (error) {
-      console.error('Error saving order:', error);
-      showMessage('儲存排序時發生錯誤，請稍後再試。', 'error');
-    }
-  };
-
-  // Add a test order
-  const handleAddOrder = async () => {
-    if (!db || menuItems.length === 0) {
-      showMessage('請先新增菜單品項，才能新增測試訂單。', 'error');
-      return;
-    }
-    const randomItems = menuItems.sort(() => 0.5 - Math.random()).slice(0, 3);
-    const items = randomItems.map(item => ({
-      name: item['品項'],
-      qty: Math.floor(Math.random() * 3) + 1
-    }));
-    const total = items.reduce((sum, item) => sum + (item.qty * (menuItems.find(menuItem => menuItem['品項'] === item.name)?.['價格'] || 0)), 0);
-    const tableNumber = Math.floor(Math.random() * 20) + 1; // Generate a random table number
-    const orderData = {
-      items,
-      total,
-      status: '進行中',
-      timestamp: new Date().toISOString(),
-      tableNumber // Add table number to the order data
-    };
-    try {
-      await addDoc(collection(db, `artifacts/${appId}/public/data/orders`), orderData);
-      showMessage('已新增測試訂單！', 'success');
-    } catch (error) {
-      console.error('Failed to add order:', error);
-      showMessage('新增訂單失敗。', 'error');
-    }
-  };
-
-  // Mark an order as complete
-  const completeOrder = async (id) => {
-    if (!db) return;
-    try {
-      await updateDoc(doc(db, `artifacts/${appId}/public/data/orders`, id), {
-        status: '已完成'
-      });
-      showMessage('訂單已標記為已完成！', 'success');
-    } catch (error) {
-      console.error('Failed to update order:', error);
-      showMessage('更新訂單失敗。', 'error');
-    }
-  };
-
-  // Delete an order
-  const deleteOrder = async (id) => {
-    if (!db) return;
-    handleConfirm({
-      message: '您確定要刪除這筆訂單嗎？',
-      action: async () => {
-        try {
-          await deleteDoc(doc(db, `artifacts/${appId}/public/data/orders`, id));
-          showMessage('訂單已刪除！', 'success');
-        } catch (error) {
-          console.error('Failed to delete order:', error);
-          showMessage('刪除訂單失敗。', 'error');
-        }
-      }
-    });
-  };
-
-  // Delete a menu item
-  const deleteItem = async (id) => {
-    if (!db) return;
-    handleConfirm({
-      message: '您確定要刪除這個品項嗎？此操作無法復原。',
-      action: async () => {
-        try {
-          await deleteDoc(doc(db, `artifacts/${appId}/public/data/menu_items`, id));
-          showMessage('品項已成功刪除！', 'success');
-        } catch (error) {
-          console.error("Error deleting document:", error);
-          showMessage('刪除品項時發生錯誤。', 'error');
-        }
-      }
-    });
-  };
-
-  // Get unique categories
-  const categories = ['all', ...new Set(menuItems.map(item => item['大分類']))].sort();
-  const filteredMenuItems = activeCategory === 'all'
-    ? menuItems
-    : menuItems.filter(item => item['大分類'] === activeCategory);
-    
-  // Initial data upload (if database is empty)
-  const uploadInitialData = async (firestore) => {
-    const checkRef = collection(firestore, `artifacts/${appId}/public/data/menu_items`);
-    const checkSnapshot = await getDocs(checkRef);
-    if (!checkSnapshot.empty) {
-        return; // Data already exists
-    }
-    
-    const csvData = `大分類,品項,價格,圖片,餐點編號
-熱門,漢堡肉芝士蛋堡+紅茶,70,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,A
-熱門,火腿芝士蛋吐司+紅茶,60,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,B
-熱門,鮪魚芝士蛋堡+紅茶,70,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,C
-熱門,檸檬雞蛋吐司+紅茶,65,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,1
-熱門,火腿蛋潛艇堡+紅茶,70,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,2
-熱門,香酥雞柳蛋堡+紅茶,80,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,3
-熱門,勁辣雞腿蛋堡+紅茶,85,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,4
-三明治,肉鬆三明治,40,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,1
-三明治,薯餅三明治,50,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,2
-漢堡,總匯漢堡,70,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,1
-漢堡,雞排漢堡,80,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,2
-蛋餅,九層塔蛋餅,45,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,1
-蛋餅,玉米蛋餅,40,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,2
-套餐,漢堡肉芝士蛋堡+紅茶,70,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,1
-套餐,火腿芝士蛋吐司+紅茶,60,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,2
-飲料,古早味紅茶,25,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,1
-飲料,鮮奶茶,40,https://doqvf81n9htmm.cloudfront.net/data/shenlin_127/shutterstock_513152440.jpg,2`;
-              
-    const lines = csvData.split('\n');
-    const headers = lines[0].split(',').map(h => h.trim());
-    const itemsToUpload = [];
-    for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map(v => v.trim());
-        if (values.length === headers.length) {
-            const item = {};
-            headers.forEach((header, index) => {
-                item[header] = (header === '價格') ? parseFloat(values[index]) : values[index];
-            });
-            item.sortOrder = i - 1;
-            itemsToUpload.push(item);
-        }
-    }
-    const batch = writeBatch(firestore);
-    itemsToUpload.forEach(item => {
-      const docRef = doc(collection(firestore, `artifacts/${appId}/public/data/menu_items`));
-      batch.set(docRef, item);
-    });
-
-    try {
-      await batch.commit();
-      console.log("Initial data uploaded in a batch.");
-    } catch (error) {
-      console.error("Error uploading initial data:", error);
-    }
-  };
-
-  return (
-    <div className="bg-gray-100 flex items-center justify-center p-2 sm:p-4 min-h-screen font-inter">
-      <div className="bg-white p-4 sm:p-6 md:p-10 rounded-2xl md:rounded-3xl shadow-2xl w-full max-w-7xl overflow-hidden">
-        
-        {/* Top navigation and title */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 md:mb-6 pb-2 md:pb-4">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-800 mb-2 md:mb-0">早餐店後台管理系統</h1>
-          <div className="flex space-x-1 sm:space-x-2 bg-gray-200 p-1 rounded-full text-sm sm:text-base">
-            <button
-              onClick={() => setActiveTab('orders')}
-              className={`py-2 px-4 sm:px-6 rounded-full font-semibold transition-colors duration-300 ${activeTab === 'orders' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-300'}`}
-            >
-              訂單管理
-            </button>
-            <button
-              onClick={() => setActiveTab('menu')}
-              className={`py-2 px-4 sm:px-6 rounded-full font-semibold transition-colors duration-300 ${activeTab === 'menu' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-300'}`}
-            >
-              菜單管理
-            </button>
-          </div>
+        <!-- Top navigation and title -->
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 md:mb-6 pb-2 md:pb-4">
+            <h1 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-800 mb-2 md:mb-0">早餐店後台管理系統</h1>
+            <div class="flex space-x-1 sm:space-x-2 bg-gray-200 p-1 rounded-full text-sm sm:text-base">
+                <button id="orders-tab" class="py-2 px-4 sm:px-6 rounded-full font-semibold transition-colors duration-300 bg-blue-600 text-white">
+                    訂單管理
+                </button>
+                <button id="menu-tab" class="py-2 px-4 sm:px-6 rounded-full font-semibold transition-colors duration-300 text-gray-700 hover:bg-gray-300">
+                    菜單管理
+                </button>
+            </div>
         </div>
 
-        {/* Order Management Tab Content */}
-        {activeTab === 'orders' && (
-          <div className="active-view">
-            <div className="flex flex-wrap justify-end gap-2 sm:gap-4 mb-4 sm:mb-6">
-              <button
-                onClick={handleAddOrder}
-                className="flex-grow sm:flex-grow-0 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 sm:px-6 rounded-xl transition duration-300 transform hover:scale-105 shadow-md text-sm sm:text-base"
-              >
-                <i className="fas fa-shopping-cart mr-2"></i>新增測試訂單
-              </button>
-            </div>
-            <div className="overflow-x-auto">
-              {(loading.orders || loading.auth) ? (
-                  <div className="min-h-[300px] flex items-center justify-center text-center text-gray-500">
-                      <i className="fas fa-spinner fa-spin text-blue-600 text-3xl mb-2"></i>
-                      <p className="mt-2 text-lg">載入訂單中...</p>
-                  </div>
-              ) : (
-                <table className="min-w-full divide-y divide-gray-200 rounded-xl overflow-hidden">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      {['桌號', '訂單時間', '總金額', '狀態', '訂單內容', '操作'].map(header => (
-                        <th key={header} scope="col" className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{header}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {orders.length === 0 ? (
-                      <tr>
-                        <td colSpan="6" className="px-6 py-4 text-center text-gray-500">目前沒有訂單</td>
-                      </tr>
-                    ) : (
-                      orders.map(order => (
-                        <tr key={order.id} className="hover:bg-gray-50 transition duration-150">
-                          <td className="px-3 py-2 sm:px-6 sm:py-4 text-sm text-gray-900 font-mono">{order.tableNumber}</td>
-                          <td className="px-3 py-2 sm:px-6 sm:py-4 text-sm text-gray-900 font-mono">{new Date(order.timestamp).toLocaleString()}</td>
-                          <td className="px-3 py-2 sm:px-6 sm:py-4 text-sm text-gray-900 font-semibold">NT$ {order.total}</td>
-                          <td className="px-3 py-2 sm:px-6 sm:py-4 text-sm">
-                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${order.status === '已完成' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                              {order.status}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 sm:px-6 sm:py-4 text-sm text-gray-500">
-                            {order.items.map(item => `${item.name} x${item.qty}`).join(', ')}
-                          </td>
-                          <td className="px-3 py-2 sm:px-6 sm:py-4 text-sm font-medium space-x-2">
-                            <button onClick={() => completeOrder(order.id)} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-1 px-3 rounded-lg transition duration-300 transform hover:scale-105">
-                              完成
-                            </button>
-                            <button onClick={() => deleteOrder(order.id)} className="bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-lg transition duration-300 transform hover:scale-105">
-                              刪除
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Menu Management Tab Content */}
-        {activeTab === 'menu' && (
-          <div className="active-view">
-            <div className="flex flex-wrap gap-2 mb-4 sm:mb-6">
-              {categories.map(category => (
-                <button
-                  key={category}
-                  onClick={() => setActiveCategory(category)}
-                  className={`py-2 px-4 rounded-full font-semibold transition-colors duration-300 text-sm sm:text-base ${activeCategory === category ? 'bg-gray-700 text-white' : 'text-gray-700 hover:bg-gray-300'}`}
-                >
-                  {category === 'all' ? '所有品項' : category}
-                </button>
-              ))}
-            </div>
-            <div className="flex flex-wrap justify-end gap-2 sm:gap-4 mb-4 sm:mb-6">
-              <button
-                onClick={handleSaveOrder}
-                className="flex-grow sm:flex-grow-0 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 sm:px-6 rounded-xl transition duration-300 transform hover:scale-105 shadow-md text-sm sm:text-base"
-              >
-                <i className="fas fa-save mr-2"></i>儲存排序
-              </button>
-              <button
-                onClick={() => openModal()}
-                className="flex-grow sm:flex-grow-0 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 sm:px-6 rounded-xl transition duration-300 transform hover:scale-105 shadow-md text-sm sm:text-base"
-              >
-                <i className="fas fa-plus-circle mr-2"></i>新增品項
-              </button>
-            </div>
-            <div className="overflow-x-auto">
-              {(loading.menu || loading.auth) ? (
-                <div className="min-h-[300px] flex items-center justify-center text-center text-gray-500">
-                  <i className="fas fa-spinner fa-spin text-blue-600 text-3xl mb-2"></i>
-                  <p className="mt-2 text-lg">載入菜單中...</p>
-                </div>
-              ) : (
-                <table className="min-w-full divide-y divide-gray-200 rounded-xl overflow-hidden">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      {['排序', '圖片', '大分類', '餐點編號', '品項', '價格', '操作'].map(header => (
-                        <th key={header} scope="col" className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{header}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200" onDragOver={(e) => e.preventDefault()}>
-                    {filteredMenuItems.length === 0 ? (
-                      <tr>
-                        <td colSpan="7" className="px-6 py-4 text-center text-gray-500">此分類目前沒有菜單品項</td>
-                      </tr>
-                    ) : (
-                      filteredMenuItems.map((item, index) => {
-                        return (
-                          <tr
-                            key={item.id}
-                            className="hover:bg-gray-50 transition duration-150 cursor-move table-row"
-                            draggable
-                            onDragStart={(e) => handleDragStart(e, item)}
-                            onDragEnd={handleDragEnd}
-                            onDrop={(e) => handleDragOver(e, item)}
-                            onTouchStart={(e) => handleTouchStart(e, item)}
-                          >
-                            <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-900">{index + 1}</td>
-                            <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
-                              {item['圖片'] ? (
-                                <img
-                                  src={item['圖片']}
-                                  alt={item['品項']}
-                                  className="h-12 w-12 sm:h-16 sm:w-16 rounded-lg object-cover shadow-sm"
-                                />
-                              ) : (
-                                <img src='https://placehold.co/64x64/E5E7EB/9CA3AF?text=No+Image' alt='無圖片' className="h-12 w-12 sm:h-16 sm:w-16 rounded-lg object-cover shadow-sm" />
-                              )}
-                            </td>
-                            <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-900">{item['大分類']}</td>
-                            <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-900">{item['餐點編號'] || '-'}</td>
-                            <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item['品項']}</td>
-                            <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-900">NT$ {item['價格']}</td>
-                            <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm font-medium">
-                              <button onClick={() => openModal(item)} className="text-blue-600 hover:text-blue-900 transition duration-150 transform hover:scale-105 mr-2">編輯</button>
-                              <button onClick={() => deleteItem(item.id)} className="text-red-600 hover:text-red-900 transition duration-150 transform hover:scale-105">刪除</button>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Status message container */}
-        {message.text && (
-          <div className={`mt-4 sm:mt-6 p-4 rounded-xl font-semibold ${message.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-            {message.text}
-          </div>
-        )}
-
-      </div>
-
-      {/* Modal for adding/editing items */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white p-6 md:p-8 rounded-2xl shadow-xl w-full max-w-lg transform transition-all duration-300 scale-100 opacity-100">
-            <h2 className="text-2xl font-bold text-gray-800 mb-6">{currentMenuItem ? '編輯菜單品項' : '新增菜單品項'}</h2>
-            <form onSubmit={handleFormSubmit} className="space-y-4">
-              <input type="hidden" name="itemId" defaultValue={currentMenuItem?.id || ''} />
-              <div>
-                <label htmlFor="major-category-select" className="block text-sm font-medium text-gray-700">大分類</label>
-                <select
-                  name="major-category-select"
-                  id="major-category-select"
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  defaultValue={currentMenuItem?.['大分類'] || (activeCategory === 'all' ? categories[1] : activeCategory)}
-                >
-                  {categories.filter(c => c !== 'all').map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-                <input
-                  type="text"
-                  name="major-category-input"
-                  id="major-category-input"
-                  placeholder="或輸入新分類"
-                  className="mt-2 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label htmlFor="item-code" className="block text-sm font-medium text-gray-700">餐點編號</label>
-                <input type="text" name="item-code" id="item-code" defaultValue={currentMenuItem?.['餐點編號'] || ''} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
-              </div>
-              <div>
-                <label htmlFor="item-name" className="block text-sm font-medium text-gray-700">品項</label>
-                <input type="text" name="item-name" id="item-name" required defaultValue={currentMenuItem?.['品項'] || ''} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
-              </div>
-              <div>
-                <label htmlFor="price" className="block text-sm font-medium text-gray-700">價格</label>
-                <input type="number" name="price" id="price" required defaultValue={currentMenuItem?.['價格'] || ''} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">圖片上傳</label>
-                <label htmlFor="image-upload" className="mt-1 inline-block bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-xl transition duration-300 transform hover:scale-105 cursor-pointer">
-                  <i className={`fas fa-spinner fa-spin mr-2 ${isUploading ? '' : 'hidden'}`}></i>
-                  {isUploading ? '上傳中...' : '選擇或上傳圖片'}
-                </label>
-                <input type="file" name="image-upload" id="image-upload" accept="image/*" className="hidden" />
-                <p className="text-xs text-gray-500 mt-1">請上傳圖片檔案 (JPG, PNG等)</p>
-                {currentMenuItem?.['圖片'] && (
-                  <div className="mt-2">
-                    <img src={currentMenuItem['圖片']} alt="Image Preview" className="h-24 w-24 rounded-lg object-cover shadow-sm" />
-                    <p className="text-xs text-gray-400 mt-1">目前圖片預覽</p>
-                  </div>
-                )}
-              </div>
-              <div className="flex justify-end space-x-4 pt-4">
-                <button type="button" onClick={closeModal} className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105">
-                  取消
-                </button>
-                <button type="submit" disabled={isUploading} className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
-                  <i className={`fas fa-save mr-2 ${isUploading ? 'hidden' : ''}`}></i>
-                  儲存
-                </button>
-              </div>
-            </form>
-          </div>
+        <!-- Main content area -->
+        <div id="content-area">
+            <!-- Content will be dynamically injected here -->
         </div>
-      )}
 
-      {/* Confirmation modal for deletion */}
-      {isConfirmModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white p-6 md:p-8 rounded-2xl shadow-xl w-full max-w-sm">
-            <p className="text-center text-lg font-semibold text-gray-800 mb-6">{currentConfirmAction?.message}</p>
-            <div className="flex justify-center space-x-4">
-              <button
-                onClick={() => handleConfirmAction(false)}
-                className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105"
-              >
-                取消
-              </button>
-              <button
-                onClick={() => handleConfirmAction(true)}
-                className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105"
-              >
-                刪除
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+        <!-- Status message container -->
+        <div id="message-container" class="mt-4 sm:mt-6"></div>
+
     </div>
-  );
-};
 
-export default App;
+    <!-- Modal for adding/editing items -->
+    <div id="item-modal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-xl w-full max-w-lg transform transition-all duration-300 scale-100 opacity-100">
+            <h2 id="modal-title" class="text-2xl font-bold text-gray-800 mb-6">新增菜單品項</h2>
+            <form id="item-form" class="space-y-4">
+                <input type="hidden" id="item-id" name="itemId" />
+                <div>
+                    <label for="major-category-select" class="block text-sm font-medium text-gray-700">大分類</label>
+                    <select id="major-category-select" name="major-category-select" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"></select>
+                    <input type="text" id="major-category-input" name="major-category-input" placeholder="或輸入新分類" class="mt-2 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
+                </div>
+                <div>
+                    <label for="item-code" class="block text-sm font-medium text-gray-700">餐點編號</label>
+                    <input type="text" id="item-code" name="item-code" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
+                </div>
+                <div>
+                    <label for="item-name" class="block text-sm font-medium text-gray-700">品項</label>
+                    <input type="text" id="item-name" name="item-name" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
+                </div>
+                <div>
+                    <label for="price" class="block text-sm font-medium text-gray-700">價格</label>
+                    <input type="number" id="price" name="price" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
+                </div>
+                <div>
+                    <label for="image-url" class="block text-sm font-medium text-gray-700">圖片網址</label>
+                    <input type="url" id="image-url" name="image-url" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
+                </div>
+                <div class="flex justify-end space-x-4 pt-4">
+                    <button type="button" id="close-modal-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105">
+                        取消
+                    </button>
+                    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105">
+                        <i class="fas fa-save mr-2"></i>儲存
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Confirmation modal for deletion -->
+    <div id="confirm-modal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-xl w-full max-w-sm">
+            <p id="confirm-message" class="text-center text-lg font-semibold text-gray-800 mb-6"></p>
+            <div class="flex justify-center space-x-4">
+                <button id="cancel-confirm-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105">
+                    取消
+                </button>
+                <button id="confirm-action-btn" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-6 rounded-xl transition duration-300 transform hover:scale-105">
+                    刪除
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc, query, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global variables for Firebase and state
+        let app, db, auth, userId;
+        let menuItems = [];
+        let orders = [];
+        let activeTab = 'orders';
+        let activeCategory = 'all';
+        let draggedItem = null;
+        let confirmAction = null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // UI Elements
+        const ordersTabBtn = document.getElementById('orders-tab');
+        const menuTabBtn = document.getElementById('menu-tab');
+        const contentArea = document.getElementById('content-area');
+        const messageContainer = document.getElementById('message-container');
+        const itemModal = document.getElementById('item-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const itemForm = document.getElementById('item-form');
+        const itemIdInput = document.getElementById('item-id');
+        const majorCategorySelect = document.getElementById('major-category-select');
+        const majorCategoryInput = document.getElementById('major-category-input');
+        const itemCodeInput = document.getElementById('item-code');
+        const itemNameInput = document.getElementById('item-name');
+        const priceInput = document.getElementById('price');
+        const imageUrlInput = document.getElementById('image-url');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const confirmModal = document.getElementById('confirm-modal');
+        const confirmMessage = document.getElementById('confirm-message');
+        const cancelConfirmBtn = document.getElementById('cancel-confirm-btn');
+        const confirmActionBtn = document.getElementById('confirm-action-btn');
+
+        // Functions to handle UI and state changes
+        const showMessage = (text, type) => {
+            messageContainer.innerHTML = `<div class="p-4 rounded-xl font-semibold ${type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">${text}</div>`;
+            setTimeout(() => {
+                messageContainer.innerHTML = '';
+            }, 3000);
+        };
+
+        const openModal = (item = null) => {
+            if (item) {
+                modalTitle.textContent = '編輯菜單品項';
+                itemIdInput.value = item.id;
+                itemCodeInput.value = item['餐點編號'] || '';
+                itemNameInput.value = item['品項'] || '';
+                priceInput.value = item['價格'] || '';
+                imageUrlInput.value = item['圖片'] || '';
+                majorCategorySelect.value = item['大分類'];
+                majorCategoryInput.value = '';
+            } else {
+                modalTitle.textContent = '新增菜單品項';
+                itemForm.reset();
+                majorCategorySelect.value = activeCategory === 'all' ? majorCategorySelect.options[0]?.value : activeCategory;
+                itemIdInput.value = '';
+            }
+            itemModal.classList.remove('hidden');
+        };
+
+        const closeModal = () => {
+            itemModal.classList.add('hidden');
+        };
+
+        const showConfirmModal = (message, action) => {
+            confirmMessage.textContent = message;
+            confirmAction = action;
+            confirmModal.classList.remove('hidden');
+        };
+
+        const hideConfirmModal = () => {
+            confirmModal.classList.add('hidden');
+            confirmAction = null;
+        };
+
+        // Firebase Initialization and Authentication
+        const initFirebase = async () => {
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        // Start listeners after authentication
+                        setupListeners();
+                    } else {
+                        userId = null;
+                        showMessage('無法驗證使用者，請重試。', 'error');
+                    }
+                });
+            } catch (error) {
+                console.error("Firebase initialization or authentication failed:", error);
+                showMessage('Firebase 初始化或認證失敗。', 'error');
+            }
+        };
+
+        // Data listeners from Firestore
+        const setupListeners = () => {
+            // Listen for menu items
+            const menuRef = collection(db, `artifacts/${appId}/public/data/menu_items`);
+            onSnapshot(menuRef, async (querySnapshot) => {
+                const items = [];
+                querySnapshot.forEach((doc) => {
+                    items.push({ id: doc.id, ...doc.data() });
+                });
+                items.sort((a, b) => {
+                    const sortA = a.sortOrder !== undefined ? a.sortOrder : Infinity;
+                    const sortB = b.sortOrder !== undefined ? b.sortOrder : Infinity;
+                    return sortA - sortB;
+                });
+                menuItems = items;
+                // If initial data is not present, upload it.
+                if (menuItems.length === 0) {
+                    await uploadInitialData();
+                }
+                renderContent();
+            }, (error) => {
+                console.error("Could not load menu data from Firestore:", error);
+                showMessage('無法從資料庫載入菜單。', 'error');
+            });
+
+            // Listen for orders
+            const ordersRef = collection(db, `artifacts/${appId}/public/data/orders`);
+            onSnapshot(ordersRef, (querySnapshot) => {
+                orders = [];
+                querySnapshot.forEach((doc) => {
+                    orders.push({ id: doc.id, ...doc.data() });
+                });
+                orders.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                if (activeTab === 'orders') {
+                    renderContent();
+                }
+            }, (error) => {
+                console.error('Failed to load orders data:', error);
+                showMessage('無法從資料庫載入訂單。', 'error');
+            });
+        };
+
+        const uploadInitialData = async () => {
+            const checkRef = collection(db, `artifacts/${appId}/public/data/menu_items`);
+            const checkSnapshot = await getDocs(checkRef);
+            if (!checkSnapshot.empty) {
+                return; // Data already exists
+            }
+            const csvData = `大分類,品項,價格,圖片,餐點編號
+熱門,漢堡肉芝士蛋堡,70,https://placehold.co/400x300/E5E7EB/9CA3AF?text=漢堡肉芝士蛋堡,A
+熱門,火腿芝士蛋吐司,60,https://placehold.co/400x300/E5E7EB/9CA3AF?text=火腿芝士蛋吐司,B
+熱門,鮪魚芝士蛋堡,70,https://placehold.co/400x300/E5E7EB/9CA3AF?text=鮪魚芝士蛋堡,C
+熱門,檸檬雞蛋吐司,65,https://placehold.co/400x300/E5E7EB/9CA3AF?text=檸檬雞蛋吐司,1
+熱門,火腿蛋潛艇堡,70,https://placehold.co/400x300/E5E7EB/9CA3AF?text=火腿蛋潛艇堡,2
+熱門,香酥雞柳蛋堡,80,https://placehold.co/400x300/E5E7EB/9CA3AF?text=香酥雞柳蛋堡,3
+熱門,勁辣雞腿蛋堡,85,https://placehold.co/400x300/E5E7EB/9CA3AF?text=勁辣雞腿蛋堡,4
+三明治,肉鬆三明治,40,https://placehold.co/400x300/E5E7EB/9CA3AF?text=肉鬆三明治,1
+三明治,薯餅三明治,50,https://placehold.co/400x300/E5E7EB/9CA3AF?text=薯餅三明治,2
+漢堡,總匯漢堡,70,https://placehold.co/400x300/E5E7EB/9CA3AF?text=總匯漢堡,1
+漢堡,雞排漢堡,80,https://placehold.co/400x300/E5E7EB/9CA3AF?text=雞排漢堡,2
+蛋餅,九層塔蛋餅,45,https://placehold.co/400x300/E5E7EB/9CA3AF?text=九層塔蛋餅,1
+蛋餅,玉米蛋餅,40,https://placehold.co/400x300/E5E7EB/9CA3AF?text=玉米蛋餅,2
+套餐,漢堡肉芝士蛋堡+紅茶,70,https://placehold.co/400x300/E5E7EB/9CA3AF?text=漢堡肉芝士蛋堡+紅茶,1
+套餐,火腿芝士蛋吐司+紅茶,60,https://placehold.co/400x300/E5E7EB/9CA3AF?text=火腿芝士蛋吐司+紅茶,2
+飲料,古早味紅茶,25,https://placehold.co/400x300/E5E7EB/9CA3AF?text=古早味紅茶,1
+飲料,鮮奶茶,40,https://placehold.co/400x300/E5E7EB/9CA3AF?text=鮮奶茶,2`;
+            
+            const lines = csvData.split('\n');
+            const headers = lines[0].split(',').map(h => h.trim());
+            const itemsToUpload = [];
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',').map(v => v.trim());
+                if (values.length === headers.length) {
+                    const item = {};
+                    headers.forEach((header, index) => {
+                        item[header] = (header === '價格') ? parseFloat(values[index]) : values[index];
+                    });
+                    item.sortOrder = i - 1;
+                    itemsToUpload.push(item);
+                }
+            }
+            const batch = writeBatch(db);
+            itemsToUpload.forEach(item => {
+              const docRef = doc(collection(db, `artifacts/${appId}/public/data/menu_items`));
+              batch.set(docRef, item);
+            });
+            try {
+              await batch.commit();
+              console.log("Initial data uploaded successfully.");
+            } catch (error) {
+              console.error("Error uploading initial data:", error);
+            }
+        };
+
+        // Render UI based on active tab
+        const renderContent = () => {
+            if (activeTab === 'orders') {
+                renderOrdersTab();
+            } else {
+                renderMenuTab();
+            }
+            updateCategorySelect();
+        };
+
+        const renderOrdersTab = () => {
+            let tableRows = '';
+            if (orders.length === 0) {
+                tableRows = `<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">目前沒有訂單</td></tr>`;
+            } else {
+                orders.forEach(order => {
+                    const statusClass = order.status === '已完成' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
+                    const itemsList = order.items.map(item => `${item.name} x${item.qty}`).join(', ');
+                    tableRows += `
+                        <tr class="hover:bg-gray-50 transition duration-150">
+                            <td class="px-3 py-2 sm:px-6 sm:py-4 text-sm text-gray-900 font-mono">${order.tableNumber}</td>
+                            <td class="px-3 py-2 sm:px-6 sm:py-4 text-sm text-gray-900 font-mono">${new Date(order.timestamp).toLocaleString()}</td>
+                            <td class="px-3 py-2 sm:px-6 sm:py-4 text-sm text-gray-900 font-semibold">NT$ ${order.total}</td>
+                            <td class="px-3 py-2 sm:px-6 sm:py-4 text-sm">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">
+                                    ${order.status}
+                                </span>
+                            </td>
+                            <td class="px-3 py-2 sm:px-6 sm:py-4 text-sm text-gray-500">${itemsList}</td>
+                            <td class="px-3 py-2 sm:px-6 sm:py-4 text-sm font-medium space-x-2">
+                                <button onclick="completeOrder('${order.id}')" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-1 px-3 rounded-lg transition duration-300 transform hover:scale-105">
+                                    完成
+                                </button>
+                                <button onclick="deleteOrder('${order.id}')" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-lg transition duration-300 transform hover:scale-105">
+                                    刪除
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+
+            contentArea.innerHTML = `
+                <div class="active-view">
+                    <div class="flex flex-wrap justify-end gap-2 sm:gap-4 mb-4 sm:mb-6">
+                        <button id="add-order-btn" class="flex-grow sm:flex-grow-0 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 sm:px-6 rounded-xl transition duration-300 transform hover:scale-105 shadow-md text-sm sm:text-base">
+                            <i class="fas fa-shopping-cart mr-2"></i>新增測試訂單
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 rounded-xl overflow-hidden">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    ${['桌號', '訂單時間', '總金額', '狀態', '訂單內容', '操作'].map(header => `<th scope="col" class="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${header}</th>`).join('')}
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                ${tableRows}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            document.getElementById('add-order-btn').addEventListener('click', handleAddOrder);
+        };
+
+        const renderMenuTab = () => {
+            const categories = ['all', ...new Set(menuItems.map(item => item['大分類']))].sort();
+            const categoryButtons = categories.map(cat => `
+                <button
+                    onclick="setActiveCategory('${cat}')"
+                    class="py-2 px-4 rounded-full font-semibold transition-colors duration-300 text-sm sm:text-base ${activeCategory === cat ? 'bg-gray-700 text-white' : 'text-gray-700 hover:bg-gray-300'}"
+                >
+                    ${cat === 'all' ? '所有品項' : cat}
+                </button>
+            `).join('');
+
+            const filteredItems = activeCategory === 'all'
+                ? menuItems
+                : menuItems.filter(item => item['大分類'] === activeCategory);
+
+            let tableRows = '';
+            if (filteredItems.length === 0) {
+                tableRows = `<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">此分類目前沒有菜單品項</td></tr>`;
+            } else {
+                filteredItems.forEach((item, index) => {
+                    const imageUrl = item['圖片'] || 'https://placehold.co/64x64/E5E7EB/9CA3AF?text=No+Image';
+                    tableRows += `
+                        <tr
+                            id="item-${item.id}"
+                            class="hover:bg-gray-50 transition duration-150 cursor-move table-row"
+                            draggable="true"
+                            data-item-id="${item.id}"
+                        >
+                            <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-900">${index + 1}</td>
+                            <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+                                <img src="${imageUrl}" alt="${item['品項']}" class="h-12 w-12 sm:h-16 sm:w-16 rounded-lg object-cover shadow-sm" />
+                            </td>
+                            <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-900">${item['大分類']}</td>
+                            <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-900">${item['餐點編號'] || '-'}</td>
+                            <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm font-medium text-gray-900">${item['品項']}</td>
+                            <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-900">NT$ ${item['價格']}</td>
+                            <td class="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm font-medium">
+                                <button onclick="openModalWithItem('${item.id}')" class="text-blue-600 hover:text-blue-900 transition duration-150 transform hover:scale-105 mr-2">編輯</button>
+                                <button onclick="deleteItem('${item.id}')" class="text-red-600 hover:text-red-900 transition duration-150 transform hover:scale-105">刪除</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+
+            contentArea.innerHTML = `
+                <div class="active-view">
+                    <div class="flex flex-wrap gap-2 mb-4 sm:mb-6">
+                        ${categoryButtons}
+                    </div>
+                    <div class="flex flex-wrap justify-end gap-2 sm:gap-4 mb-4 sm:mb-6">
+                        <button id="save-order-btn" class="flex-grow sm:flex-grow-0 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 sm:px-6 rounded-xl transition duration-300 transform hover:scale-105 shadow-md text-sm sm:text-base">
+                            <i class="fas fa-save mr-2"></i>儲存排序
+                        </button>
+                        <button id="add-item-btn" class="flex-grow sm:flex-grow-0 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 sm:px-6 rounded-xl transition duration-300 transform hover:scale-105 shadow-md text-sm sm:text-base">
+                            <i class="fas fa-plus-circle mr-2"></i>新增品項
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 rounded-xl overflow-hidden">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    ${['排序', '圖片', '大分類', '餐點編號', '品項', '價格', '操作'].map(header => `<th scope="col" class="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${header}</th>`).join('')}
+                                </tr>
+                            </thead>
+                            <tbody id="menu-table-body" class="bg-white divide-y divide-gray-200">
+                                ${tableRows}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            // Add event listeners for new elements
+            document.getElementById('add-item-btn').addEventListener('click', () => openModal());
+            document.getElementById('save-order-btn').addEventListener('click', handleSaveOrder);
+            setupDragAndDrop();
+        };
+        
+        // Update category select options
+        const updateCategorySelect = () => {
+            if (!majorCategorySelect) return;
+            const categories = [...new Set(menuItems.map(item => item['大分類']))].sort();
+            majorCategorySelect.innerHTML = categories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+        };
+
+        // Event Listeners
+        window.addEventListener('load', initFirebase);
+        ordersTabBtn.addEventListener('click', () => {
+            activeTab = 'orders';
+            ordersTabBtn.classList.add('bg-blue-600', 'text-white');
+            ordersTabBtn.classList.remove('text-gray-700', 'hover:bg-gray-300');
+            menuTabBtn.classList.remove('bg-blue-600', 'text-white');
+            menuTabBtn.classList.add('text-gray-700', 'hover:bg-gray-300');
+            renderContent();
+        });
+        menuTabBtn.addEventListener('click', () => {
+            activeTab = 'menu';
+            menuTabBtn.classList.add('bg-blue-600', 'text-white');
+            menuTabBtn.classList.remove('text-gray-700', 'hover:bg-gray-300');
+            ordersTabBtn.classList.remove('bg-blue-600', 'text-white');
+            ordersTabBtn.classList.add('text-gray-700', 'hover:bg-gray-300');
+            renderContent();
+        });
+        closeModalBtn.addEventListener('click', closeModal);
+        cancelConfirmBtn.addEventListener('click', hideConfirmModal);
+        confirmActionBtn.addEventListener('click', () => {
+            if (confirmAction) {
+                confirmAction();
+                hideConfirmModal();
+            }
+        });
+        itemForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const id = itemIdInput.value;
+            const selectedMajorCategory = majorCategorySelect.value;
+            const newMajorCategory = majorCategoryInput.value.trim();
+            const finalMajorCategory = newMajorCategory || selectedMajorCategory;
+            const price = parseFloat(priceInput.value);
+
+            if (isNaN(price)) {
+                showMessage('價格必須是數字！', 'error');
+                return;
+            }
+
+            const itemData = {
+                '大分類': finalMajorCategory,
+                '餐點編號': itemCodeInput.value,
+                '品項': itemNameInput.value,
+                '價格': price,
+                '圖片': imageUrlInput.value || ''
+            };
+
+            try {
+                if (id) {
+                    await updateDoc(doc(db, `artifacts/${appId}/public/data/menu_items`, id), itemData);
+                    showMessage('品項已成功更新！', 'success');
+                } else {
+                    const newSortOrder = menuItems.length;
+                    const newItemData = { ...itemData, sortOrder: newSortOrder };
+                    await addDoc(collection(db, `artifacts/${appId}/public/data/menu_items`), newItemData);
+                    showMessage('品項已成功新增！', 'success');
+                }
+            } catch (error) {
+                console.error("Error saving item:", error);
+                showMessage('儲存品項時發生錯誤。', 'error');
+            }
+            closeModal();
+        });
+
+        // Global functions for event listeners attached via HTML
+        window.openModalWithItem = (itemId) => {
+            const item = menuItems.find(i => i.id === itemId);
+            if (item) {
+                openModal(item);
+            }
+        };
+
+        window.setActiveCategory = (category) => {
+            activeCategory = category;
+            renderMenuTab();
+        };
+
+        window.completeOrder = async (orderId) => {
+            if (!db) return;
+            try {
+                await updateDoc(doc(db, `artifacts/${appId}/public/data/orders`, orderId), {
+                    status: '已完成'
+                });
+                showMessage('訂單已標記為已完成！', 'success');
+            } catch (error) {
+                console.error('Failed to update order:', error);
+                showMessage('更新訂單失敗。', 'error');
+            }
+        };
+
+        window.deleteOrder = (orderId) => {
+            showConfirmModal('您確定要刪除這筆訂單嗎？', async () => {
+                if (!db) return;
+                try {
+                    await deleteDoc(doc(db, `artifacts/${appId}/public/data/orders`, orderId));
+                    showMessage('訂單已刪除！', 'success');
+                } catch (error) {
+                    console.error('Failed to delete order:', error);
+                    showMessage('刪除訂單失敗。', 'error');
+                }
+            });
+        };
+
+        window.deleteItem = (itemId) => {
+            showConfirmModal('您確定要刪除這個品項嗎？此操作無法復原。', async () => {
+                if (!db) return;
+                try {
+                    await deleteDoc(doc(db, `artifacts/${appId}/public/data/menu_items`, itemId));
+                    showMessage('品項已成功刪除！', 'success');
+                } catch (error) {
+                    console.error("Error deleting document:", error);
+                    showMessage('刪除品項時發生錯誤。', 'error');
+                }
+            });
+        };
+
+        const handleAddOrder = async () => {
+            if (!db || menuItems.length === 0) {
+                showMessage('請先新增菜單品項，才能新增測試訂單。', 'error');
+                return;
+            }
+            const randomItems = menuItems.sort(() => 0.5 - Math.random()).slice(0, 3);
+            const items = randomItems.map(item => ({
+                name: item['品項'],
+                qty: Math.floor(Math.random() * 3) + 1
+            }));
+            const total = items.reduce((sum, item) => sum + (item.qty * (menuItems.find(menuItem => menuItem['品項'] === item.name)?.['價格'] || 0)), 0);
+            const tableNumber = Math.floor(Math.random() * 20) + 1;
+            const orderData = {
+                items,
+                total,
+                status: '進行中',
+                timestamp: new Date().toISOString(),
+                tableNumber
+            };
+            try {
+                await addDoc(collection(db, `artifacts/${appId}/public/data/orders`), orderData);
+                showMessage('已新增測試訂單！', 'success');
+            } catch (error) {
+                console.error('Failed to add order:', error);
+                showMessage('新增訂單失敗。', 'error');
+            }
+        };
+
+        const handleSaveOrder = async () => {
+            if (!db || menuItems.length === 0) {
+                showMessage('沒有可以儲存的資料。', 'error');
+                return;
+            }
+            const batch = writeBatch(db);
+            menuItems.forEach((item, index) => {
+                const itemRef = doc(db, `artifacts/${appId}/public/data/menu_items`, item.id);
+                batch.update(itemRef, { sortOrder: index });
+            });
+            try {
+                await batch.commit();
+                showMessage('菜單順序已成功儲存！', 'success');
+            } catch (error) {
+                console.error('Error saving order:', error);
+                showMessage('儲存排序時發生錯誤，請稍後再試。', 'error');
+            }
+        };
+
+        const setupDragAndDrop = () => {
+            const tbody = document.getElementById('menu-table-body');
+            tbody.addEventListener('dragstart', (e) => {
+                const target = e.target.closest('tr');
+                draggedItem = target;
+                e.dataTransfer.setData('text/plain', target.dataset.itemId);
+                target.classList.add('dragging');
+            });
+
+            tbody.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                const target = e.target.closest('tr');
+                if (target && target !== draggedItem) {
+                    const rect = target.getBoundingClientRect();
+                    const next = (e.clientY - rect.top) / rect.height > 0.5;
+                    tbody.insertBefore(draggedItem, next && target.nextSibling || target);
+                }
+            });
+
+            tbody.addEventListener('dragend', () => {
+                if (draggedItem) {
+                    draggedItem.classList.remove('dragging');
+                    draggedItem = null;
+                }
+                updateMenuItemsOrder();
+            });
+
+            // Add touch event listeners for mobile drag/drop simulation
+            let touchItem = null;
+            let initialY = 0;
+            let initialTouchMove = 0;
+
+            tbody.addEventListener('touchstart', (e) => {
+                const target = e.target.closest('tr');
+                if (target) {
+                    e.preventDefault(); // Prevent scrolling
+                    touchItem = target;
+                    initialY = e.touches[0].clientY;
+                    touchItem.classList.add('dragging');
+                }
+            }, { passive: false });
+
+            tbody.addEventListener('touchmove', (e) => {
+                if (!touchItem) return;
+                e.preventDefault();
+                const currentY = e.touches[0].clientY;
+                const deltaY = currentY - initialY;
+                const currentTouchMove = e.touches[0].clientY;
+                
+                touchItem.style.transform = `translateY(${deltaY}px)`;
+
+                const allRows = Array.from(tbody.querySelectorAll('tr'));
+                allRows.forEach(row => {
+                    const rect = row.getBoundingClientRect();
+                    if (currentTouchMove > rect.top && currentTouchMove < rect.bottom && row !== touchItem) {
+                        const targetIndex = allRows.indexOf(row);
+                        const currentIndex = allRows.indexOf(touchItem);
+                        if (targetIndex !== currentIndex) {
+                            if (currentIndex < targetIndex) {
+                                tbody.insertBefore(touchItem, row.nextSibling);
+                            } else {
+                                tbody.insertBefore(touchItem, row);
+                            }
+                        }
+                    }
+                });
+            }, { passive: false });
+
+            tbody.addEventListener('touchend', () => {
+                if (touchItem) {
+                    touchItem.classList.remove('dragging');
+                    touchItem.style.transform = '';
+                    touchItem = null;
+                    updateMenuItemsOrder();
+                }
+            });
+        };
+
+        const updateMenuItemsOrder = () => {
+            const newOrder = [];
+            const rows = document.getElementById('menu-table-body').querySelectorAll('tr');
+            rows.forEach((row, index) => {
+                const itemId = row.dataset.itemId;
+                const item = menuItems.find(i => i.id === itemId);
+                if (item) {
+                    newOrder.push({ ...item, sortOrder: index });
+                }
+            });
+            menuItems = newOrder;
+            // Re-render to update the visible sort order numbers
+            renderMenuTab();
+        };
+
+        window.onload = () => {
+            initFirebase();
+            renderContent();
+        };
+    </script>
+</body>
+</html>
