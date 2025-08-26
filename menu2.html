@@ -117,8 +117,18 @@
         let draggedItem = null;
         let confirmAction = null;
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // Use the firebase config provided by the user
+        const firebaseConfig = {
+            apiKey: "AIzaSyC4YeUVgqiQlZssaXnYee_mtD2MXfbcwtE",
+            authDomain: "project-7242265943022381509.firebaseapp.com",
+            projectId: "project-7242265943022381509",
+            storageBucket: "project-7242265943022381509.firebasestorage.app",
+            messagingSenderId: "95453496573",
+            appId: "1:95453496573:web:696833aa8e3062dbcd2a94",
+            measurementId: "G-XCTVQZ724Z"
+        };
 
         // UI Elements
         const ordersTabBtn = document.getElementById('orders-tab');
@@ -186,23 +196,29 @@
         // Firebase Initialization and Authentication
         const initFirebase = async () => {
             try {
+                // IMPORTANT FIX: Pass the firebaseConfig to initializeApp
                 app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
+                console.log("Firebase initialized successfully.");
 
                 if (initialAuthToken) {
                     await signInWithCustomToken(auth, initialAuthToken);
+                    console.log("Signed in with custom token.");
                 } else {
                     await signInAnonymously(auth);
+                    console.log("Signed in anonymously.");
                 }
 
                 onAuthStateChanged(auth, async (user) => {
                     if (user) {
                         userId = user.uid;
+                        console.log("User authenticated:", userId);
                         // Start listeners after authentication
                         setupListeners();
                     } else {
                         userId = null;
+                        console.log("User not authenticated.");
                         showMessage('無法驗證使用者，請重試。', 'error');
                     }
                 });
@@ -328,7 +344,7 @@
                         <tr class="hover:bg-gray-50 transition duration-150">
                             <td class="px-3 py-2 sm:px-6 sm:py-4 text-sm text-gray-900 font-mono">${order.tableNumber}</td>
                             <td class="px-3 py-2 sm:px-6 sm:py-4 text-sm text-gray-900 font-mono">${new Date(order.timestamp).toLocaleString()}</td>
-                            <td class="px-3 py-2 sm:px-6 sm:py-4 text-sm text-gray-900 font-semibold">NT$ ${order.total}</td>
+                            <td class="px-3 py-2 sm:px-6 sm:py-4 text-sm font-semibold">NT$ ${order.total}</td>
                             <td class="px-3 py-2 sm:px-6 sm:py-4 text-sm">
                                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">
                                     ${order.status}
